@@ -1,0 +1,14 @@
+target/
+node_modules/
+*.pyc
+.DS_Store
+.env
+*.tfvars
+!*.tfvars.example
+coverage/
+__pycache__/
+.venv/
+*.db-journal
+package-lock.json
+styles/global.css
+styles/variables.css
