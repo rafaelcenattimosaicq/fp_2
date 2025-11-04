@@ -143,3 +143,19 @@ pub struct VpnConfig {
     pub provisioner_url: String,
     pub pre_shared_secret: Option<String>,
 }
+
+/// minimum poll interval we'll actually honour. Anything below this and the
+/// modbus RTU bus can't turnaround in time on the RS-485 transceiver, plus
+/// the Pi's CPU pegs at 100% trying to keep up.
+const MIN_POLL_INTERVAL_MS: u64 = 100;
+
+pub fn load_config(path: &Path) -> Result<GatewayConfig, Box<dyn std::error::Error>> {
+    let contents = std::fs::read_to_string(path)?;
+    let mut config: GatewayConfig = serde_yaml::from_str(&contents)?;
+
+    if config.poll_interval_ms < MIN_POLL_INTERVAL_MS {
+        config.poll_interval_ms = MIN_POLL_INTERVAL_MS;
+    }
+
+    Ok(config)
+}
