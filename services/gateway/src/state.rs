@@ -24,6 +24,11 @@ impl fmt::Display for ConnectionStatus {
     }
 }
 
+// NOTE: considered adding a Timeout variant here but the Modbus
+// library already maps timeouts to Error("timed out"), so we'd
+// just be duplicating. Leaving this as a reminder.
+// Timeout(Duration),
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VpnStatus {
     NotConfigured,
