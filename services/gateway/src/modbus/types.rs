@@ -23,7 +23,7 @@ pub struct BatchEntry {
 //   0x0100+        alarm flags
 // gap of 4 keeps the first two merged on most descriptor revisions
 // without pulling in too many garbage addresses between them.
-const GAP_TOL: u16 = 4;
+const GAP_TOL: u16 = 6;
 
 // fC03/FC04 PDU limit is 125 registers per request.
 // cH340-based USB-RS485 clones choke above ~80 regs but we haven't
