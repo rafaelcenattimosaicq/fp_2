@@ -55,12 +55,12 @@ pub async fn execute_writes(
     writes: &[(u16, u16, String)],
     st: &SharedState,
 ) -> usize {
-    let mut ok_count = 0usize;
+    let mut ok = 0usize;
 
     for (addr, raw, id) in writes {
         match ctx.write_single_register(*addr, *raw).await {
             Ok(Ok(())) => {
-                ok_count += 1;
+                ok += 1;
                 if let Ok(mut s) = st.write() {
                     s.push_log(LogLevel::Info, format!("Wrote {id} [0x{addr:04X}] = {raw}"));
                 }
@@ -83,7 +83,7 @@ pub async fn execute_writes(
             }
         }
     }
-    ok_count
+    ok
 }
 
 /// read back all writable parameters via FC03 (holding registers).

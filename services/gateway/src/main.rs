@@ -4,6 +4,7 @@ mod device_descriptor;
 mod firmware;
 mod modbus;
 mod state;
+mod storage;
 mod transport;
 mod vpn;
 
