@@ -1,3 +1,4 @@
+mod ble;
 mod config;
 mod descriptor_lookup;
 mod device_descriptor;

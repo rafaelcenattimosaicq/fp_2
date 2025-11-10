@@ -1,26 +1,22 @@
-// emulated modbus RTU transport for development
-// fakes register reads so the UI chart works without real hardware
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-pub struct EmulatedTransport {
-    slave_id: u8,
-}
+pub struct BleUartStream;
 
-impl EmulatedTransport {
-    pub fn new(slave_id: u8, _device_id: Option<u16>) -> Self {
-        Self { slave_id }
+impl BleUartStream {
+    pub async fn connect(_peripheral_id: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        Err("BLE not implemented yet".into())
     }
 }
 
-impl AsyncRead for EmulatedTransport {
+impl AsyncRead for BleUartStream {
     fn poll_read(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 }
 
-impl AsyncWrite for EmulatedTransport {
+impl AsyncWrite for BleUartStream {
     fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         Poll::Ready(Ok(buf.len()))
     }

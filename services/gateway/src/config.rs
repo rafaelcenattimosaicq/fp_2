@@ -147,7 +147,13 @@ pub struct VpnConfig {
 /// minimum poll interval we'll actually honour. Anything below this and the
 /// modbus RTU bus can't turnaround in time on the RS-485 transceiver, plus
 /// the Pi's CPU pegs at 100% trying to keep up.
-const MIN_POLL_INTERVAL_MS: u64 = 100;
+const MIN_POLL_INTERVAL_MS: u64 = 50;
+
+// TODO(rc): should we cap poll_interval at 10s?
+// talked to supervisor, he said maybe
+// if config.poll_interval_ms > 10000 {
+//     config.poll_interval_ms = 10000;
+// }
 
 pub fn load_config(path: &Path) -> Result<GatewayConfig, Box<dyn std::error::Error>> {
     let contents = std::fs::read_to_string(path)?;
