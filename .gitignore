@@ -9,6 +9,9 @@ coverage/
 __pycache__/
 .venv/
 *.db-journal
+services/gateway/target/
+*.db
+*.db-wal
 package-lock.json
 styles/global.css
 styles/variables.css
