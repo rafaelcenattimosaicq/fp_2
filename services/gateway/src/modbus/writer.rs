@@ -5,10 +5,6 @@ use crate::state::{LogLevel, SharedState};
 use std::collections::HashMap;
 use tokio_modbus::prelude::{Reader, Writer};
 
-/// commands sent from the UI thread to the background Modbus poller.
-/// using an enum instead of separate channels because we tried that first
-/// and the ordering guarantees were a nightmare, write followed by read-back
-/// needs to happen in order, and with separate channels they'd race.
 #[derive(Debug, Clone)]
 pub enum BackgroundCommand {
     WriteRegs(Vec<(String, f64)>),
@@ -24,111 +20,85 @@ pub enum BackgroundCommand {
 }
 pub type BgCmd = BackgroundCommand;
 
-// FIXME(rc): BackgroundCommand should probably carry a oneshot::Sender
-// so the UI can await confirmation instead of polling state
-// type BgCmdWithReply = (BackgroundCommand, tokio::sync::oneshot::Sender<bool>);
 
-/// builds (address, `raw_value`, id) tuples for writing.
-/// silently drops unknown IDs, the UI can send stale register IDs if the
-/// user switches devices while a write request is in flight.
 pub fn prepare_writes(
     writes: &[(String, f64)],
     params: &[Register],
 ) -> Vec<(u16, u16, String)> {
-    let mut out = Vec::with_capacity(writes.len());
-    for (id, val) in writes {
-        // linear scan is fine, param lists are 10-30 entries max on the client
-        let Some(reg) = params.iter().find(|r| r.id == *id) else { continue };
-        if let Some(addr) = reg.address {
-            out.push((addr, reg.encode(*val), id.clone()));
+    let mut res = Vec::with_capacity(writes.len());
+    for (id, v) in writes {
+        // linear scan is fine, param lists are 10-30 entries on joinville compressors
+        let Some(r) = params.iter().find(|x| x.id == *id) else { continue };
+        if let Some(a) = r.address {
+            res.push((a, r.encode(*v), id.clone()));
         }
     }
-    out
+    res
 }
 
-/// writes registers one at a time via FC06 (write single register).
-/// returns how many succeeded. We don't batch writes because the client
-/// inverters need a small delay between register writes (empirically
-/// ~50ms, but tokio-modbus already adds frame gaps so it works out).
+// FC06 write single register, one at a time.
+// joinville compressors need ~50ms delay between writes but
+// tokio-modbus already adds frame gaps so it works out
 pub async fn execute_writes(
     ctx: &mut tokio_modbus::client::Context,
     writes: &[(u16, u16, String)],
     st: &SharedState,
 ) -> usize {
-    let mut ok_count = 0usize;
+    let mut n = 0usize;
 
     for (addr, raw, id) in writes {
         match ctx.write_single_register(*addr, *raw).await {
             Ok(Ok(())) => {
-                ok_count += 1;
+                n += 1;
                 if let Ok(mut s) = st.write() {
                     s.push_log(LogLevel::Info, format!("Wrote {id} [0x{addr:04X}] = {raw}"));
                 }
             }
             Ok(Err(exc)) => {
-                // modbus exception = device explicitly rejected the write.
-                // usually a read-only register or value out of range.
-                // we used to log this at Info and nobody noticed for weeks
-                // until the Joinville tech filed ticket #47 about "parameters
-                // not saving". Now it's Error so it shows up red in the UI.
-                tracing::warn!("write {id} got Modbus exception: {exc}");
                 if let Ok(mut s) = st.write() {
                     s.push_log(LogLevel::Error, format!("Device rejected write to {id}: {exc}"));
                 }
             }
             Err(e) => {
-                // transport-level: cable yank, timeout, CRC failure
-                tracing::warn!("write {id} @ 0x{addr:04X}: {e}");
                 st.write().unwrap().push_log(LogLevel::Info, format!("Write failed for {id}: {e}"));
             }
         }
     }
-    ok_count
+    n
 }
 
-/// read back all writable parameters via FC03 (holding registers).
-/// partial failures are fine, we keep whatever we got. This happens
-/// surprisingly often after FW updates; the param table sometimes needs
-/// a power cycle before it responds to FC03 again.
 pub async fn read_parameters(
     ctx: &mut tokio_modbus::client::Context,
     params: &[Register],
     st: &SharedState,
 ) {
-    let batches = build_batches(params);
-    let mut vals: HashMap<String, RegisterValue> = HashMap::new();
-    let mut n_failed = 0u32;
+    let tmp = build_batches(params);
+    let mut data: HashMap<String, RegisterValue> = HashMap::new();
+    let mut errs = 0u32;
 
-    for batch in &batches {
+    for b in &tmp {
         // fC03 read_holding_registers
-        let resp = ctx.read_holding_registers(batch.base_addr, batch.count).await;
-        match resp {
+        match ctx.read_holding_registers(b.base_addr, b.count).await {
             Ok(Ok(raw)) => {
-                for br in &batch.entries {
-                    let idx = usize::from(br.offset);
-                    if idx < raw.len() {
-                        vals.insert(br.register.id.clone(), br.register.decode(raw[idx]));
+                for x in &b.entries {
+                    let i = usize::from(x.offset);
+                    if i < raw.len() {
+                        data.insert(x.register.id.clone(), x.register.decode(raw[i]));
                     }
                 }
             }
-            Ok(Err(exc)) => {
-                tracing::debug!(addr = batch.base_addr, "param batch FC03 exception: {exc}");
-                n_failed += 1;
-            }
-            Err(e) => {
-                tracing::debug!(addr = batch.base_addr, "param batch read failed: {e}");
-                n_failed += 1;
-            }
+            Ok(Err(_exc)) => { errs += 1; }
+            Err(_e) => { errs += 1; }
         }
     }
 
     let mut s = st.write().unwrap();
-    let count = vals.len();
-    s.parameter_values = vals;
-    if n_failed > 0 {
-        s.push_log(LogLevel::Info, format!("Read {count} params ({n_failed} batch(es) failed)"));
+    let n = data.len();
+    s.parameter_values = data;
+    if errs > 0 {
+        s.push_log(LogLevel::Info, format!("Read {n} params ({errs} batch(es) failed)"));
     } else {
-        s.push_log(LogLevel::Info, format!("Read {count} parameter values"));
+        s.push_log(LogLevel::Info, format!("Read {n} parameter values"));
     }
     drop(s);
 }
@@ -163,7 +133,6 @@ mod tests {
         }
     }
 
-    // multiplier encoding: 15.2 * 10.0 = 152 raw, 2.0 * 10.0 = 20 raw
     #[test]
     fn encode_with_multiplier() {
         let params = vec![
@@ -179,7 +148,6 @@ mod tests {
         assert_eq!(w[1], (18, 20, "DIFF".to_string()));
     }
 
-    // stale ID from a previous device session, should just be dropped
     #[test]
     fn stale_id_dropped() {
         let params = vec![mkparam("KNOWN", Some(10), None)];
@@ -187,7 +155,6 @@ mod tests {
         assert!(w.is_empty());
     }
 
-    // computed params like COP have no modbus address
     #[test]
     fn no_address_skipped() {
         let params = vec![mkparam("COP_CALC", None, None)];

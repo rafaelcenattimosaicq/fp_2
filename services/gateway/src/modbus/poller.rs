@@ -24,7 +24,7 @@ struct LiveDevice {
 /// fTDI adapters also show up as ttyUSB0 but with different VID/PID.
 /// TODO: we should probably filter by VID/PID so users don't try to connect
 /// to their mouse or keyboard by accident (happened once at Joinville demo)
-fn enumerate_serial(state: &SharedState) {
+fn enumerate_serial(st: &SharedState) {
     let ports: Vec<(String, String)> = match serialport::available_ports() {
         Ok(found) => found.into_iter().map(|p| {
             let lbl = match &p.port_type {
@@ -50,7 +50,7 @@ fn enumerate_serial(state: &SharedState) {
         }
     };
 
-    let mut s = state.write().unwrap();
+    let mut s = st.write().unwrap();
     s.push_log(LogLevel::Info, format!("Found {} serial port(s)", ports.len()));
     s.available_ports = ports;
 }

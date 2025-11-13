@@ -438,4 +438,299 @@ mod tests {
         }
     }
 
+    // helper to build a FC06 write-single-register request frame
+    fn mk_write(slave: u8, addr: u16, value: u16) -> Vec<u8> {
+        let mut f = vec![
+            slave, 0x06,
+            (addr >> 8) as u8, addr as u8,
+            (value >> 8) as u8, value as u8,
+        ];
+        push_crc(&mut f);
+        f
+    }
+
+    fn mk_read_hold(slave: u8, addr: u16, count: u16) -> Vec<u8> {
+        let mut f = vec![
+            slave, 0x03,
+            (addr >> 8) as u8, addr as u8,
+            (count >> 8) as u8, count as u8,
+        ];
+        push_crc(&mut f);
+        f
+    }
+
+    // pull the first register value out of a FC03/FC04 response
+    fn drain_resp_reg(t: &mut EmulatedTransport) -> u16 {
+        let resp: Vec<u8> = t.resp_buf.drain(..).collect();
+        assert!(resp.len() >= 7, "response too short: {} bytes", resp.len());
+        assert!(check_crc(&resp));
+        u16::from(resp[3]) << 8 | u16::from(resp[4])
+    }
+
+    #[test]
+    fn crc16_known_vector() {
+        // verified against online Modbus CRC calculator
+        let data = [0x01, 0x03, 0x00, 0x00, 0x00, 0x01];
+        assert_eq!(crc16(&data), 0x0A84, "CRC should match known test vector");
+    }
+
+    #[test]
+    fn crc_roundtrip_and_corruption() {
+        let mut frame = vec![0x01, 0x03, 0x00, 0x00, 0x00, 0x01];
+        push_crc(&mut frame);
+        assert!(check_crc(&frame));
+
+        // flip a bit, should fail. this catches the kind of errors we see
+        // on long RS-485 runs (>15m with cheap unshielded cable from the
+        // joinville warehouse)
+        let last = frame.len() - 1;
+        frame[last] ^= 0xFF;
+        assert!(!check_crc(&frame), "corrupted CRC should fail validation");
+    }
+
+    #[test]
+    fn device_id_register_is_preseeded() {
+        let t = EmulatedTransport::new(1, None);
+        assert_eq!(t.hold_regs.get(&DEV_ID_ADDR), Some(&DEFAULT_DEV_ID));
+    }
+
+    #[test]
+    fn seed_registers_populates_both_maps() {
+        // tEMP at input reg 100, scaled by 10x. default 25.0 -> raw 250
+        let status = vec![mk_reg("TEMP", 100, Some(25.0), Some(10.0))];
+        let params = vec![mk_reg("SETPOINT", 200, Some(5.0), Some(10.0))];
+
+        let mut t = EmulatedTransport::new(1, None);
+        t.seed_registers(&status, &params);
+
+        assert_eq!(t.inp_regs.get(&100), Some(&250));
+        assert_eq!(t.hold_regs.get(&200), Some(&50));
+    }
+
+    #[test]
+    fn fc03_reads_holding_with_jitter() {
+        let mut t = EmulatedTransport::new(1, None);
+        let base: u16 = 0x1234;
+        t.hold_regs.insert(0, base);
+
+        let mut req = vec![0x01, 0x03, 0x00, 0x00, 0x00, 0x01];
+        push_crc(&mut req);
+        t.process_frame(&req);
+
+        assert!(!t.resp_buf.is_empty());
+        let resp: Vec<u8> = t.resp_buf.drain(..).collect();
+        assert_eq!(resp[0], 0x01); // slave
+        assert_eq!(resp[1], 0x03); // fc
+        assert_eq!(resp[2], 0x02); // byte count
+        let actual = u16::from(resp[3]) << 8 | u16::from(resp[4]);
+        // jitter is +-5% so allow 6% tolerance to avoid flaky tests
+        let tol = f64::from(base) * 0.06;
+        assert!((f64::from(actual) - f64::from(base)).abs() <= tol);
+        assert!(check_crc(&resp));
+    }
+
+    #[test]
+    fn fc04_reads_input_with_jitter() {
+        let mut t = EmulatedTransport::new(1, None);
+        let base: u16 = 0xABCD;
+        t.inp_regs.insert(10, base);
+
+        let mut req = vec![0x01, 0x04, 0x00, 0x0A, 0x00, 0x01];
+        push_crc(&mut req);
+        t.process_frame(&req);
+
+        let resp: Vec<u8> = t.resp_buf.drain(..).collect();
+        assert_eq!(resp[0], 0x01);
+        assert_eq!(resp[1], 0x04);
+        assert_eq!(resp[2], 0x02);
+        let actual = u16::from(resp[3]) << 8 | u16::from(resp[4]);
+        let tol = f64::from(base) * 0.06;
+        assert!(
+            (f64::from(actual) - f64::from(base)).abs() <= tol,
+            "jittered {actual} should be within +-5% of {base}"
+        );
+        assert!(check_crc(&resp));
+    }
+
+    #[test]
+    fn fc06_writes_and_echoes() {
+        let mut t = EmulatedTransport::new(1, None);
+
+        let mut req = vec![0x01, 0x06, 0x00, 0x05, 0x00, 0xFF];
+        push_crc(&mut req);
+        t.process_frame(&req);
+
+        // value should be stored
+        assert_eq!(t.hold_regs.get(&5), Some(&0x00FF));
+
+        // echo should be identical to request (minus our CRC)
+        let resp: Vec<u8> = t.resp_buf.drain(..).collect();
+        assert_eq!(resp[0], 0x01);
+        assert_eq!(resp[1], 0x06);
+        assert_eq!(resp[2], 0x00);
+        assert_eq!(resp[3], 0x05);
+        assert_eq!(resp[4], 0x00);
+        assert_eq!(resp[5], 0xFF);
+        assert!(check_crc(&resp));
+    }
+
+    #[test]
+    fn unsupported_fc_returns_exception() {
+        let mut t = EmulatedTransport::new(1, None);
+        let mut req = vec![0x01, 0x08, 0x00, 0x00, 0x00, 0x00];
+        push_crc(&mut req);
+        t.process_frame(&req);
+
+        let resp: Vec<u8> = t.resp_buf.drain(..).collect();
+        assert_eq!(resp[0], 0x01);
+        assert_eq!(resp[1], 0x88, "exception FC = 0x08 | 0x80");
+        assert_eq!(resp[2], 0x01);  // illegal function
+        assert!(check_crc(&resp));
+    }
+
+    #[test]
+    fn bad_crc_silently_dropped() {
+        // on a real bus this happens when someone plugs in a cheap USB-serial
+        // adapter with no ground reference, we just ignore it
+        let mut t = EmulatedTransport::new(1, None);
+        let req = vec![0x01, 0x03, 0x00, 0x00, 0x00, 0x01, 0xFF, 0xFF];
+        t.process_frame(&req);
+        assert!(t.resp_buf.is_empty(), "bad CRC should produce no response");
+    }
+
+    #[test]
+    fn wrong_slave_id_ignored() {
+        let mut t = EmulatedTransport::new(1, None);
+        let mut req = vec![0x02, 0x03, 0x00, 0x00, 0x00, 0x01];
+        push_crc(&mut req);
+        t.process_frame(&req);
+        assert!(t.resp_buf.is_empty());
+    }
+
+    #[test]
+    fn unseeded_register_returns_near_zero() {
+        // reading a register we never wrote, should get small jitter around 0
+        let mut t = EmulatedTransport::new(1, None);
+        let mut req = vec![0x01, 0x03, 0x03, 0xE7, 0x00, 0x01]; // addr 999
+        push_crc(&mut req);
+        t.process_frame(&req);
+
+        let resp: Vec<u8> = t.resp_buf.drain(..).collect();
+        let val = u16::from(resp[3]) << 8 | u16::from(resp[4]);
+        assert!(val <= 3);
+    }
+
+    //, OTA flow tests ---------------------------------------------------
+    // these mirror what the real ota.rs does against actual hardware
+
+    #[test]
+    fn ota_full_happy_path() {
+        use crate::firmware::types;
+        let slave = 1;
+        let mut t = EmulatedTransport::new(slave, None);
+
+        // 512 bytes of fake firmware
+        let fw: Vec<u8> = (0u16..256).flat_map(|i| i.to_be_bytes()).collect();
+        assert_eq!(fw.len(), 512, "test firmware should be exactly 512 bytes");
+        let fw_crc = types::crc32(&fw);
+        let fw_sz = fw.len() as u32;
+
+        // 1) START
+        let f = mk_write(slave, types::REG_OTA_CONTROL, types::OTA_CMD_START);
+        t.process_frame(&f); t.resp_buf.clear();
+
+        // 2) size + crc metadata
+        t.process_frame(&mk_write(slave, types::REG_FW_SIZE_HIGH, (fw_sz >> 16) as u16));
+        t.resp_buf.clear();
+        t.process_frame(&mk_write(slave, types::REG_FW_SIZE_LOW, (fw_sz & 0xFFFF) as u16));
+        t.resp_buf.clear();
+        t.process_frame(&mk_write(slave, types::REG_CRC_HIGH, (fw_crc >> 16) as u16));
+        t.resp_buf.clear();
+        t.process_frame(&mk_write(slave, types::REG_CRC_LOW, (fw_crc & 0xFFFF) as u16));
+        t.resp_buf.clear();
+
+        // 3) data chunks
+        for (ci, chunk) in fw.chunks(types::CHUNK_SIZE).enumerate() {
+            for (j, pair) in chunk.chunks(2).enumerate() {
+                let v = u16::from_be_bytes([pair[0], pair[1]]);
+                t.process_frame(&mk_write(slave, types::REG_DATA_WINDOW_START + j as u16, v));
+                t.resp_buf.clear();
+            }
+            // chunk sequence ack
+            t.process_frame(&mk_write(slave, types::REG_OTA_CONTROL, 0x10 + ci as u16));
+            t.resp_buf.clear();
+        }
+
+        // 4) COMMIT
+        t.process_frame(&mk_write(slave, types::REG_OTA_CONTROL, types::OTA_CMD_COMMIT));
+        t.resp_buf.clear();
+
+        // verify status = SUCCESS
+        t.process_frame(&mk_read_hold(slave, types::REG_OTA_CONTROL, 1));
+        let st = drain_resp_reg(&mut t);
+        assert_eq!(st, types::OTA_STATUS_SUCCESS);
+
+        // verify firmware version bumped
+        t.process_frame(&mk_read_hold(slave, types::REG_FIRMWARE_VERSION, 1));
+        let ver = drain_resp_reg(&mut t);
+        assert_eq!(ver, 0x0101, "version should bump from 0x0100 to 0x0101 after OTA");
+    }
+
+    #[test]
+    fn ota_bad_crc_reports_error() {
+        use crate::firmware::types;
+        let slave = 1;
+        let mut t = EmulatedTransport::new(slave, None);
+        let fw: Vec<u8> = vec![0xAA; 256];
+        let fw_sz = fw.len() as u32;
+        let bad_crc: u32 = 0xDEAD_BEEF; // intentionally wrong
+
+        t.process_frame(&mk_write(slave, types::REG_OTA_CONTROL, types::OTA_CMD_START));
+        t.resp_buf.clear();
+
+        t.process_frame(&mk_write(slave, types::REG_FW_SIZE_HIGH, (fw_sz >> 16) as u16));
+        t.resp_buf.clear();
+        t.process_frame(&mk_write(slave, types::REG_FW_SIZE_LOW, (fw_sz & 0xFFFF) as u16));
+        t.resp_buf.clear();
+        t.process_frame(&mk_write(slave, types::REG_CRC_HIGH, (bad_crc >> 16) as u16));
+        t.resp_buf.clear();
+        t.process_frame(&mk_write(slave, types::REG_CRC_LOW, (bad_crc & 0xFFFF) as u16));
+        t.resp_buf.clear();
+
+        for (j, pair) in fw.chunks(2).enumerate() {
+            let v = u16::from_be_bytes([pair[0], pair[1]]);
+            t.process_frame(&mk_write(slave, types::REG_DATA_WINDOW_START + j as u16, v));
+            t.resp_buf.clear();
+        }
+        t.process_frame(&mk_write(slave, types::REG_OTA_CONTROL, 0x10));
+        t.resp_buf.clear();
+
+        t.process_frame(&mk_write(slave, types::REG_OTA_CONTROL, types::OTA_CMD_COMMIT));
+        t.resp_buf.clear();
+
+        t.process_frame(&mk_read_hold(slave, types::REG_OTA_CONTROL, 1));
+        let st = drain_resp_reg(&mut t);
+        assert_eq!(st, types::OTA_STATUS_ERROR, "should report ERROR on CRC mismatch");
+
+        // version should NOT have changed
+        t.process_frame(&mk_read_hold(slave, types::REG_FIRMWARE_VERSION, 1));
+        let ver = drain_resp_reg(&mut t);
+        assert_eq!(ver, 0x0100);
+    }
+
+    #[test]
+    fn ota_abort_resets_to_idle() {
+        use crate::firmware::types;
+        let slave = 1;
+        let mut t = EmulatedTransport::new(slave, None);
+
+        t.process_frame(&mk_write(slave, types::REG_OTA_CONTROL, types::OTA_CMD_START));
+        t.resp_buf.clear();
+        t.process_frame(&mk_write(slave, types::REG_OTA_CONTROL, types::OTA_CMD_ABORT));
+        t.resp_buf.clear();
+
+        t.process_frame(&mk_read_hold(slave, types::REG_OTA_CONTROL, 1));
+        let st = drain_resp_reg(&mut t);
+        assert_eq!(st, types::OTA_STATUS_IDLE, "should return to IDLE after ABORT");
+    }
 }
