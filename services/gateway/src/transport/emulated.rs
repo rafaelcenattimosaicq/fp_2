@@ -226,54 +226,216 @@ impl EmulatedTransport {
         r
     }
 
+    // fC 04, Read Input Registers
+    // telemetry: suction/discharge temps, compressor RPM, power, etc
     fn fc04_read_input(&mut self, frame: &[u8]) -> Vec<u8> {
-        // TODO: implement FC04
-        let mut r = vec![self.sid, 0x04 | 0x80, 0x01];
+        let start = u16::from(frame[2]) << 8 | u16::from(frame[3]);
+        let cnt = u16::from(frame[4]) << 8 | u16::from(frame[5]);
+
+        let mut r = vec![self.sid, 0x04];
+        #[allow(clippy::cast_possible_truncation, reason = "Modbus count fits in u8")]
+        r.push((cnt * 2) as u8);
+
+        for i in 0..cnt {
+            let a = start + i;
+            let base_val = self.inp_regs.get(&a).copied().unwrap_or(0);
+            let v = self.jitter(base_val);  // always jitter input regs
+            r.push((v >> 8) as u8);
+            #[allow(clippy::cast_possible_truncation, reason = "low byte")]
+            r.push(v as u8);
+        }
         push_crc(&mut r);
         r
     }
 
+    // fC 06, Write Single Register
+    // this one got complicated once OTA was added, the control register at 60100
+    // drives a whole state machine (START -> data chunks -> COMMIT/ABORT)
     fn fc06_write_single(&mut self, frame: &[u8]) -> Vec<u8> {
-        // TODO: implement FC06
-        frame.to_vec()
+        use crate::firmware::types;
+        let addr = u16::from(frame[2]) << 8 | u16::from(frame[3]);
+        let val = u16::from(frame[4]) << 8 | u16::from(frame[5]);
+
+        // oTA control register has special handling
+        if addr == types::REG_OTA_CONTROL {
+            self.written_addrs.insert(addr);
+            match val {
+                types::OTA_CMD_START => {
+                    self.ota_active = true;
+                    self.ota_fw.clear();
+                    self.hold_regs.insert(addr, types::OTA_STATUS_RECEIVING);
+                    tracing::info!("Emulated OTA: START received");
+                }
+                types::OTA_CMD_COMMIT => {
+                    self.hold_regs.insert(addr, types::OTA_STATUS_VALIDATING);
+                    tracing::info!(
+                        size = self.ota_fw.len(),
+                        expected = self.ota_sz,
+                        "Emulated OTA: COMMIT received, validating"
+                    );
+
+                    let actual_crc = types::crc32(&self.ota_fw);
+                    // FIXME: should we add a small delay here to simulate flash erase time?
+                    // real devices take ~200ms for the erase cycle
+                    #[allow(clippy::cast_possible_truncation, reason = "firmware size is always well under 4GB")]
+                    if actual_crc == self.ota_crc && self.ota_fw.len() as u32 == self.ota_sz {
+                        let cur = self.hold_regs.get(&types::REG_FIRMWARE_VERSION).copied().unwrap_or(0x0100);
+                        let nv = cur + 1;
+                        self.hold_regs.insert(types::REG_FIRMWARE_VERSION, nv);
+                        self.written_addrs.insert(types::REG_FIRMWARE_VERSION);
+                        self.hold_regs.insert(addr, types::OTA_STATUS_SUCCESS);
+                        tracing::info!(new_version = format!("0x{nv:04X}"), "Emulated OTA: flash successful");
+                    } else {
+                        self.hold_regs.insert(addr, types::OTA_STATUS_ERROR);
+                        tracing::warn!(
+                            actual_crc, expected_crc = self.ota_crc,
+                            actual_size = self.ota_fw.len(), expected_size = self.ota_sz,
+                            "Emulated OTA: CRC or size mismatch"
+                        );
+                    }
+                    self.ota_active = false;
+                }
+                types::OTA_CMD_ABORT => {
+                    // user cancelled or timeout, just reset everything
+                    self.ota_active = false;
+                    self.ota_fw.clear();
+                    self.hold_regs.insert(addr, types::OTA_STATUS_IDLE);
+                    tracing::info!("Emulated OTA: ABORT received");
+                }
+                _ if val >= 0x10 && self.ota_active => {
+                    // chunk sequence number, just ack it
+                    self.hold_regs.insert(addr, types::OTA_STATUS_RECEIVING);
+                }
+                _ => { self.hold_regs.insert(addr, val); }
+            }
+        } else if addr == types::REG_FW_SIZE_HIGH {
+            self.ota_sz = (u32::from(val) << 16) | (self.ota_sz & 0xFFFF);
+            self.hold_regs.insert(addr, val);
+            self.written_addrs.insert(addr);
+        } else if addr == types::REG_FW_SIZE_LOW {
+            self.ota_sz = (self.ota_sz & 0xFFFF_0000) | u32::from(val);
+            self.hold_regs.insert(addr, val);  self.written_addrs.insert(addr);
+        } else if addr == types::REG_CRC_HIGH {
+            self.ota_crc = (u32::from(val) << 16) | (self.ota_crc & 0xFFFF);
+            self.hold_regs.insert(addr, val);
+            self.written_addrs.insert(addr);
+        } else if addr == types::REG_CRC_LOW {
+            self.ota_crc = (self.ota_crc & 0xFFFF_0000) | u32::from(val);
+            self.hold_regs.insert(addr, val);  self.written_addrs.insert(addr);
+        } else if (types::REG_DATA_WINDOW_START..=types::REG_DATA_WINDOW_END).contains(&addr) && self.ota_active {
+            // firmware data chunk, accumulate into ota_fw buffer
+            self.ota_fw.extend_from_slice(&val.to_be_bytes());
+            self.hold_regs.insert(addr, val);
+            self.written_addrs.insert(addr);
+        } else {
+            // generic holding register write, setpoints, thresholds etc
+            self.hold_regs.insert(addr, val);
+            self.written_addrs.insert(addr);
+        }
+
+        // fC06 echo: slave + fc + addr_hi + addr_lo + val_hi + val_lo + crc
+        let mut resp = vec![self.sid, 0x06, frame[2], frame[3], frame[4], frame[5]];
+        push_crc(&mut resp);
+        resp
+    }
+
+    // all standard modbus RTU requests are exactly 8 bytes (slave + fc + 4 data + 2 crc)
+    // NOTE: FC16 (write multiple) would be variable length but we don't support it
+    const fn expected_req_len() -> usize { 8 }
+}
+
+impl std::fmt::Debug for EmulatedTransport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // don't dump all the register maps, it's huge
+        f.debug_struct("EmulatedTransport")
+            .field("sid", &self.sid)
+            .field("inp_regs", &self.inp_regs.len())
+            .field("hold_regs", &self.hold_regs.len())
+            .field("resp_pending", &self.resp_buf.len())
+            .finish_non_exhaustive()
     }
 }
 
+// asyncRead, the "serial port" read side. Returns response bytes that were
+// queued up by process_frame(). If nothing is ready, park the waker.
 impl AsyncRead for EmulatedTransport {
-    fn poll_read(mut self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
-        if self.resp_buf.is_empty() {
-            if let Some(w) = self.waker.take() { w.wake(); }
-            self.waker = Some(_cx.waker().clone());
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this = self.get_mut();
+        if this.resp_buf.is_empty() {
+            this.waker = Some(cx.waker().clone());
             return Poll::Pending;
         }
-        let n = buf.remaining().min(self.resp_buf.len());
-        for b in self.resp_buf.drain(..n) {
-            buf.put_slice(&[b]);
+        // drain as many bytes as the caller's buffer can hold
+        let n = this.resp_buf.len().min(buf.remaining());
+        for _ in 0..n {
+            if let Some(b) = this.resp_buf.pop_front() {
+                buf.put_slice(&[b]);
+            }
         }
         Poll::Ready(Ok(()))
     }
 }
 
+// asyncWrite, the "serial port" write side. Accumulates bytes until we
+// have a complete 8-byte request frame, then processes it.
 impl AsyncWrite for EmulatedTransport {
-    fn poll_write(mut self: Pin<&mut Self>, _cx: &mut Context<'_>, data: &[u8]) -> Poll<io::Result<usize>> {
-        self.req_buf.extend_from_slice(data);
-        if self.req_buf.len() >= 8 {
-            let frame = self.req_buf.clone();
-            self.req_buf.clear();
-            self.process_frame(&frame);
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.get_mut();
+        let len = buf.len();
+        this.req_buf.extend_from_slice(buf);
+
+        // try to consume complete frames
+        while this.req_buf.len() >= 2 {
+            let exp = Self::expected_req_len();
+            if this.req_buf.len() >= exp {
+                let frame: Vec<u8> = this.req_buf.drain(..exp).collect();
+                this.process_frame(&frame);
+            } else {
+                break;
+            }
         }
-        Poll::Ready(Ok(data.len()))
+        Poll::Ready(Ok(len))
     }
+
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Poll::Ready(Ok(()))
+        Poll::Ready(Ok(()))  // nothing to flush, it's all in memory
     }
+
     fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 }
 
-impl std::fmt::Debug for EmulatedTransport {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EmulatedTransport").field("sid", &self.sid).finish()
+// -------------------------------------------------------------------------
+// tests
+// -------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::device_descriptor::Register;
+
+    fn mk_reg(id: &str, addr: u16, default: Option<f64>, mult: Option<f64>) -> Register {
+        Register {
+            id: id.to_string(),
+            register_type: Some("unsigned integer".to_string()),
+            name: None, acronym: None, description: None,
+            address: Some(addr),
+            min_value: None, max_value: None,
+            default_value: default, multiplier: mult,
+            unit: None,
+            is_read_only: None, is_write_only: None, is_visible: None,
+            read_access_level: None, write_access_level: None,
+            hw_sw_set_mask: None, is_delta: None, in_chart: None,
+            fields: vec![],
+        }
     }
+
 }
