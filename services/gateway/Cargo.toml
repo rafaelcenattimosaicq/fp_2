@@ -10,6 +10,7 @@ serde_yaml = "0.9"
 tokio-modbus = "0.15"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 tracing = "0.1"
+rusqlite = { version = "0.31", features = ["bundled"] }
 serialport = { version = "4.7", default-features = false }
 tokio-serial = "5.4"
 

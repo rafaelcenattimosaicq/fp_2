@@ -1,9 +1,5 @@
 use crate::device_descriptor::Register;
 
-/// contiguous-ish group of registers readable in a single FC03/FC04 call.
-/// "contiguous-ish" because we allow small gaps (`GAP_TOLERANCE` addresses)
-/// to avoid splitting the client temperature register clusters into separate
-/// reads when there's a 2-3 address hole between them.
 #[derive(Debug, Clone)]
 pub struct RegBatch {
     pub base_addr: u16,
@@ -17,60 +13,47 @@ pub struct BatchEntry {
     pub register: Register,
 }
 
-// VEMB descriptors have 3 typical address clusters:
-//   0x0000-0x001F  operating status
-//   0x0040-0x005F  temperatures (suction, discharge, evap, condenser)
-//   0x0100+        alarm flags
-// gap of 4 keeps the first two merged on most descriptor revisions
-// without pulling in too many garbage addresses between them.
+// VEMB descriptors have 3 typical address clusters, gap of 4
+// keeps the first two merged on most descriptor revisions
 const GAP_TOL: u16 = 4;
 
-// NOTE: tried GAP_TOL=8 but that merged unrelated clusters
-// on the VEMB-302 firmware, leaving at 4 for now
-
-// fC03/FC04 PDU limit is 125 registers per request.
-// cH340-based USB-RS485 clones choke above ~80 regs but we haven't
-// hit that in prod yet so we use the spec limit. If we ever deploy
-// with CH340 adapters this needs to drop to 75 or so.
+// modbus spec says max 125 regs per read
+// CH340 clones choke above ~80 but we havent hit that in prod yet
 // FIXME: make configurable per-adapter? probably overkill
-const MAX_REGS_PER_READ: u16 = 120;
+const MAX_REGS_PER_READ: u16 = 125;
 
-/// sorts registers by address, groups nearby ones into batches.
-/// registers without an address (computed/derived values like COP) are skipped.
 pub fn build_batches(regs: &[Register]) -> Vec<RegBatch> {
-    // filter + sort
-    let mut sorted: Vec<&Register> = regs.iter().filter(|r| r.address.is_some()).collect();
-    sorted.sort_by_key(|r| r.address.unwrap_or(0));
+    let mut tmp: Vec<&Register> = regs.iter().filter(|r| r.address.is_some()).collect();
+    tmp.sort_by_key(|r| r.address.unwrap_or(0));
 
-    let mut out: Vec<RegBatch> = Vec::new();
-    let mut cur: Option<RegBatch> = None;
+    let mut res: Vec<RegBatch> = Vec::new();
+    let mut x: Option<RegBatch> = None;
 
-    for reg in sorted {
-        let addr = reg.address.unwrap_or(0);
+    for item in tmp {
+        let a = item.address.unwrap_or(0);
 
-        // decide whether this register fits in the current batch
-        let extend = cur.as_ref().is_some_and(|b| {
-            let gap = addr.saturating_sub(b.base_addr + b.count);
-            let span = addr - b.base_addr + 1;
-            gap <= GAP_TOL && span <= MAX_REGS_PER_READ
+        let ok = x.as_ref().is_some_and(|b| {
+            let g = a.saturating_sub(b.base_addr + b.count);
+            let s = a - b.base_addr + 1;
+            g <= GAP_TOL && s <= MAX_REGS_PER_READ
         });
 
-        if extend {
-            let b = cur.as_mut().expect("just checked");
-            b.count = addr - b.base_addr + 1;
-            b.entries.push(BatchEntry { offset: addr - b.base_addr, register: reg.clone() });
+        if ok {
+            let b = x.as_mut().expect("just checked");
+            b.count = a - b.base_addr + 1;
+            b.entries.push(BatchEntry { offset: a - b.base_addr, register: item.clone() });
         } else {
-            if let Some(done) = cur.take() { out.push(done); }
-            cur = Some(RegBatch {
-                base_addr: addr,
+            if let Some(done) = x.take() { res.push(done); }
+            x = Some(RegBatch {
+                base_addr: a,
                 count: 1,
-                entries: vec![BatchEntry { offset: 0, register: reg.clone() }],
+                entries: vec![BatchEntry { offset: 0, register: item.clone() }],
             });
         }
     }
-    if let Some(last) = cur { out.push(last); }
+    if let Some(v) = x { res.push(v); }
 
-    out
+    res
 }
 
 #[cfg(test)]
@@ -149,16 +132,11 @@ mod tests {
 
     #[test]
     fn empty_input() { assert!(build_batches(&[]).is_empty()); }
-
-    // found during Joinville commissioning: someone duplicated a register
-    // line in the YAML descriptor and the old batching code panicked because
-    // it computed a negative offset. This is a regression test for that.
     #[test]
     fn dup_address_doesnt_panic() {
         let b = build_batches(&[r("R1", Some(50)), r("R1_COPY", Some(50))]);
         assert_eq!(b.len(), 1);
         assert_eq!(b[0].entries.len(), 2);
-        // both get offset 0, the decode step handles dedup
         assert_eq!(b[0].entries[0].offset, 0);
         assert_eq!(b[0].entries[1].offset, 0);
     }
