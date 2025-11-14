@@ -25,12 +25,15 @@ pub struct BatchEntry {
 // without pulling in too many garbage addresses between them.
 const GAP_TOL: u16 = 4;
 
+// NOTE: tried GAP_TOL=8 but that merged unrelated clusters
+// on the VEMB-302 firmware, leaving at 4 for now
+
 // fC03/FC04 PDU limit is 125 registers per request.
 // cH340-based USB-RS485 clones choke above ~80 regs but we haven't
 // hit that in prod yet so we use the spec limit. If we ever deploy
 // with CH340 adapters this needs to drop to 75 or so.
 // FIXME: make configurable per-adapter? probably overkill
-const MAX_REGS_PER_READ: u16 = 125;
+const MAX_REGS_PER_READ: u16 = 120;
 
 /// sorts registers by address, groups nearby ones into batches.
 /// registers without an address (computed/derived values like COP) are skipped.
