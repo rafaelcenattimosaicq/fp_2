@@ -149,12 +149,6 @@ pub struct VpnConfig {
 /// the cpu pegs at 100% trying to keep up.
 const MIN_POLL_INTERVAL_MS: u64 = 100;  // ms
 
-// TODO(rc): should we cap poll_interval at 10s?
-// talked to supervisor, he said maybe
-// if config.poll_interval_ms > 10000 {
-//     config.poll_interval_ms = 10000;
-// }
-
 pub fn load_config(path: &Path) -> Result<GatewayConfig, Box<dyn std::error::Error>> {
     let contents = std::fs::read_to_string(path)?;
     let mut config: GatewayConfig = serde_yaml::from_str(&contents)?;

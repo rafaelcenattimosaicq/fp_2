@@ -137,6 +137,97 @@ impl HistoryDb {
         self.rows_since_prune.store(0, std::sync::atomic::Ordering::Relaxed);
     }
 
+    pub fn query_range(
+        &self,
+        start_ms: i64,
+        end_ms: i64,
+        register_ids: &[String],
+    ) -> Vec<(i64, String, f64)> {
+        let Ok(conn) = self.conn.lock() else {
+            return Vec::new();
+        };
+
+        if register_ids.is_empty() {
+            let Ok(mut stmt) = conn.prepare(
+                "SELECT timestamp_ms, register_id, value FROM register_history
+                 WHERE timestamp_ms BETWEEN ?1 AND ?2
+                 ORDER BY timestamp_ms ASC",
+            ) else {
+                return Vec::new();
+            };
+
+            stmt.query_map(params![start_ms, end_ms], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })
+            .map_or_else(|_| Vec::new(), |rows| rows.filter_map(Result::ok).collect())
+        } else {
+            // can't use a static prepared statement here because the number of
+            // register_ids varies. The placeholders are positional (?3, ?4, ...)
+            // which is ugly but avoids any SQL injection since they're all bound.
+            let placeholders: Vec<String> = register_ids
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!("?{}", i + 3))
+                .collect();
+            let sql = format!(
+                "SELECT timestamp_ms, register_id, value FROM register_history
+                 WHERE timestamp_ms BETWEEN ?1 AND ?2
+                 AND register_id IN ({})
+                 ORDER BY timestamp_ms ASC",
+                placeholders.join(", ")
+            );
+
+            let Ok(mut stmt) = conn.prepare(&sql) else {
+                return Vec::new();
+            };
+
+            let params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = {
+                let mut v: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+                v.push(Box::new(start_ms));
+                v.push(Box::new(end_ms));
+                for id in register_ids {
+                    v.push(Box::new(id.clone()));
+                }
+                v
+            };
+
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+                params_vec.iter().map(AsRef::as_ref).collect();
+
+            stmt.query_map(param_refs.as_slice(), |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })
+            .map_or_else(|_| Vec::new(), |rows| rows.filter_map(Result::ok).collect())
+        }
+    }
+
+    pub fn available_registers(&self) -> Vec<String> {
+        let Ok(conn) = self.conn.lock() else {
+            return Vec::new();
+        };
+
+        let Ok(mut stmt) = conn.prepare(
+            "SELECT DISTINCT register_id FROM register_history ORDER BY register_id",
+        ) else {
+            return Vec::new();
+        };
+
+        stmt.query_map([], |row| row.get(0))
+            .map_or_else(|_| Vec::new(), |rows| rows.filter_map(Result::ok).collect())
+    }
+
+    /// rough row count for the status page. Not exact, we don't want to
+    /// pay for a full COUNT(*) on every UI refresh.
+    #[allow(dead_code, reason = "reserved for the status page UI that shows disk usage")]
+    pub fn approx_row_count(&self) -> Option<i64> {
+        let conn = self.conn.lock().ok()?;
+        // this reads from sqlite_stat1 which is only populated after ANALYZE.
+        // falls back to max(rowid) which over-counts if rows were deleted but
+        // is close enough for a "disk usage" indicator in the UI.
+        conn.query_row(
+            "SELECT MAX(id) FROM register_history", [], |r| r.get(0),
+        ).ok()
+    }
 }
 
 fn db_path(gateway_id: &str) -> PathBuf {
@@ -155,4 +246,86 @@ fn dirs_fallback() -> PathBuf {
 
 fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp_db() -> (tempfile::TempDir, HistoryDb) {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_file = tmp.path().join("test.db");
+        let conn = Connection::open(&db_file).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE register_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp_ms INTEGER NOT NULL,
+                register_id TEXT NOT NULL,
+                value REAL NOT NULL
+            );",
+        )
+        .unwrap();
+
+        let db = HistoryDb {
+            conn: Arc::new(Mutex::new(conn)),
+            rows_since_prune: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+        };
+        (tmp, db)
+    }
+
+    #[test]
+    fn insert_and_query_back() {
+        let (_tmp, db) = tmp_db();
+
+        let mut values = HashMap::new();
+        values.insert("temperature".to_string(), RegisterValue::Float(25.5));
+        values.insert("rpm".to_string(), RegisterValue::Unsigned(1200));
+        values.insert(
+            "mode".to_string(),
+            RegisterValue::Enum("cooling".to_string()),
+        );
+
+        db.insert_poll(&values);
+
+        let rows = db.query_range(0, i64::MAX, &[]);
+        assert_eq!(rows.len(), 2, "should store Float and Unsigned but not Enum");
+
+        let rows = db.query_range(0, i64::MAX, &["temperature".to_string()]);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].1, "temperature");
+        assert!((rows[0].2 - 25.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn available_registers_sorted() {
+        let (_tmp, db) = tmp_db();
+
+        let mut v1 = HashMap::new();
+        v1.insert("temp".to_string(), RegisterValue::Float(20.0));
+        v1.insert("rpm".to_string(), RegisterValue::Unsigned(800));
+        db.insert_poll(&v1);
+        db.insert_poll(&v1);
+
+        let regs = db.available_registers();
+        assert_eq!(regs, vec!["rpm", "temp"]);
+    }
+
+    // regression: we had a bug where query_range with an empty register_ids
+    // slice would return nothing because the IN clause was empty. Now it
+    // takes a different code path (no IN clause at all).
+    #[test]
+    fn query_range_empty_filter_returns_all() {
+        let (_tmp, db) = tmp_db();
+
+        let mut v = HashMap::new();
+        v.insert("a".to_string(), RegisterValue::Float(1.0));
+        v.insert("b".to_string(), RegisterValue::Float(2.0));
+        db.insert_poll(&v);
+
+        let all = db.query_range(0, i64::MAX, &[]);
+        assert_eq!(all.len(), 2);
+
+        let just_a = db.query_range(0, i64::MAX, &["a".to_string()]);
+        assert_eq!(just_a.len(), 1);
+    }
 }

@@ -16,7 +16,7 @@ pub enum ConnectionStatus {
 impl fmt::Display for ConnectionStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Disconnected => f.write_str("Disconnected"),
+            Self::Disconnected => f.write_str("disconnected"),
             Self::Connecting => f.write_str("Connecting"),
             Self::Connected => f.write_str("Connected"),
             Self::Error(reason) => write!(f, "Error: {reason}"),
