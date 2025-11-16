@@ -26,6 +26,10 @@ const MQTT_PORT_DEFAULT: u16 = 1883;
 // (~1-5 seconds). If the channel fills up the broker is probably dead anyway.
 const CHAN_CAP: usize = 10;
 
+// TODO: tried CHAN_CAP=5 during Joinville stress test but messages
+// backed up when the broker lagged, bumped back to 10
+// const _OLD_CHAN_CAP: usize = 5;
+
 /// Parse broker URL into (host, port). Strips mqtt:// or tcp:// scheme.
 ///
 /// FIXME: Docker on Linux sometimes gives us IPv6-mapped IPv4 like
