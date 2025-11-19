@@ -173,12 +173,10 @@ impl Register {
     }
 
     fn decode_enum(&self, raw: u16) -> RegisterValue {
-        let label = self
-            .fields
-            .iter()
+        let label = self.fields.iter()
             .find(|f| f.index == raw)
             .and_then(|f| f.name.clone())
-            .unwrap_or_else(|| format!("Unknown({raw})"));
+            .unwrap_or_else(|| format!("?{raw}"));
 
         RegisterValue::Enum(label)
     }
