@@ -84,9 +84,6 @@ pub struct Register {
     pub max_value: Option<f64>,
     #[serde(default)]
     pub default_value: Option<f64>,
-    // NOTE: older descriptor versions store this as an integer (e.g. 10) while
-    // newer ones use float (e.g. 10.0). serde_yaml handles both, but watch out
-    // if you ever switch to a stricter parser.
     #[serde(default)]
     pub multiplier: Option<f64>,
     #[serde(default)]
@@ -129,9 +126,9 @@ pub enum RegisterValue {
 
 impl Register {
     pub fn decode(&self, raw: u16) -> RegisterValue {
-        let type_str = self.register_type.as_deref().unwrap_or("");
+        let t = self.register_type.as_deref().unwrap_or("");
 
-        match type_str {
+        match t {
             "integer" => self.decode_integer(raw),
             "enum" => self.decode_enum(raw),
             "bitwise" => self.decode_bitwise(raw),
@@ -156,44 +153,46 @@ impl Register {
 
     fn decode_integer(&self, raw: u16) -> RegisterValue {
         #[allow(clippy::cast_possible_wrap)]
-        let signed = raw as i16;
-        let multiplier = self.effective_multiplier();
+        let v = raw as i16;
+        let m = self.effective_multiplier();
 
-        RegisterValue::Float(f64::from(signed) / multiplier)
+        RegisterValue::Float(f64::from(v) / m)
     }
 
     fn decode_unsigned(&self, raw: u16) -> RegisterValue {
-        let multiplier = self.effective_multiplier();
+        let m = self.effective_multiplier();
 
-        if (multiplier - 1.0).abs() < f64::EPSILON {
+        if (m - 1.0).abs() < f64::EPSILON {
             RegisterValue::Unsigned(u64::from(raw))
         } else {
-            RegisterValue::Float(f64::from(raw) / multiplier)
+            RegisterValue::Float(f64::from(raw) / m)
         }
     }
 
     fn decode_enum(&self, raw: u16) -> RegisterValue {
-        let label = self.fields.iter()
+        let s = self
+            .fields
+            .iter()
             .find(|f| f.index == raw)
             .and_then(|f| f.name.clone())
-            .unwrap_or_else(|| format!("?{raw}"));
+            .unwrap_or_else(|| format!("Unknown({raw})"));
 
-        RegisterValue::Enum(label)
+        RegisterValue::Enum(s)
     }
 
     fn decode_bitwise(&self, raw: u16) -> RegisterValue {
-        let mut bits = HashMap::new();
+        let mut res = HashMap::new();
 
-        for field in &self.fields {
-            let bit_name = field
+        for x in &self.fields {
+            let n = x
                 .name
                 .clone()
-                .unwrap_or_else(|| format!("bit_{}", field.index));
-            let is_set = (raw >> field.index) & 1 == 1;
-            bits.insert(bit_name, is_set);
+                .unwrap_or_else(|| format!("bit_{}", x.index));
+            let v = (raw >> x.index) & 1 == 1;
+            res.insert(n, v);
         }
 
-        RegisterValue::Bitwise(bits)
+        RegisterValue::Bitwise(res)
     }
 
     #[allow(
@@ -201,20 +200,20 @@ impl Register {
         clippy::cast_sign_loss
     )]
     pub fn encode(&self, value: f64) -> u16 {
-        let type_str = self.register_type.as_deref().unwrap_or("");
-        let multiplier = self.effective_multiplier();
+        let t = self.register_type.as_deref().unwrap_or("");
+        let m = self.effective_multiplier();
 
-        match type_str {
+        match t {
             "integer" => {
-                let raw = (value * multiplier).round() as i16;
-                raw as u16
+                let r = (value * m).round() as i16;
+                r as u16
             }
             "enum" | "bitwise" | "boolean" => {
                 value.round() as u16
             }
             _ => {
-                let raw = (value * multiplier).round();
-                raw as u16
+                let r = (value * m).round();
+                r as u16
             }
         }
     }
@@ -262,9 +261,9 @@ pub struct ParamRef {
 }
 
 pub fn load_descriptor(path: &Path) -> Result<DeviceDescriptor, Box<dyn std::error::Error>> {
-    let contents = std::fs::read_to_string(path)?;
-    let descriptor: DeviceDescriptor = serde_yaml::from_str(&contents)?;
-    Ok(descriptor)
+    let buf = std::fs::read_to_string(path)?;
+    let d: DeviceDescriptor = serde_yaml::from_str(&buf)?;
+    Ok(d)
 }
 
 #[cfg(test)]
