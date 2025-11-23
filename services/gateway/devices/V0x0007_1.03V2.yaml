@@ -1,0 +1,4949 @@
+yaml_version: 1.00.00
+Device Description:
+  type: Controller
+  Device ID: '0x0007'
+  Software Version: 1.03.00
+  hw_sw_set:
+    address: 60191
+    length: 4
+    default_value: 0xFFFFFFFF
+  units_handling:
+  - id: UNIT_TEMPERATURE
+    selection_param: PARAM_IHM_TEMP_UNIT
+  access_level:
+    password_input: PARAM_SESSION_OPEN
+    read_access_level: STATUS_ID_CURRENT_ACCESS_LEVEL
+characteristics:
+  parameters:
+  - id: PARAM_INFO_DEVICE_ID
+    type: unsigned integer
+    name: Device ID
+    acronym: Info_01
+    description: '-'
+    address: 60000
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_INFO_SW_VERSION
+    type: unsigned integer
+    name: Software Version
+    acronym: Info_02
+    description: '-'
+    address: 60001
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SESSION_OPEN
+    type: unsigned integer
+    name: Password input
+    acronym: P00
+    description: Parameter to be written with the password for accessing parameters
+    address: 60169
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_write_only: true
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_PSWD_LEVEL1
+    type: unsigned integer
+    name: Level 1 password
+    acronym: P01
+    description: Value of the level 1 password
+    address: 60166
+    min_value: 1.0
+    max_value: 999.0
+    default_value: 111.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_PSWD_LEVEL2
+    type: unsigned integer
+    name: Level 2 password
+    acronym: P02
+    description: Value of the level 2 password
+    address: 60167
+    min_value: 1.0
+    max_value: 999.0
+    default_value: 222.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_PSWD_LEVEL_CTRL_ENABLE
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Control port acess level enable
+    acronym: P03
+    description: Enabler of the access level management for control port
+    address: 60164
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_PSWD_LEVEL_RS485_ENABLE
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: RS485 port acess level enable
+    acronym: P04
+    description: Enabler of the access level management for RS485 port
+    address: 60165
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_SETPOINT
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Setpoint
+    acronym: t00
+    description: 'Control range: t00 to t00 + t01'
+    address: 60002
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 4.0
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_HYSTERESIS
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Hysteresis
+    acronym: t01
+    description: 'Control range: t00 to t00 + t01'
+    address: 60003
+    min_value: 1.0
+    max_value: 99.9
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+    is_delta: true
+  - id: PARAM_TH_MIN_SETPOINT
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Setpoint Minimum
+    acronym: t02
+    description: Minimum value for t00
+    address: 60004
+    min_value: -99.9
+    max_value: 99.9
+    default_value: -30.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_MAX_SETPOINT
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Setpoint Maximum
+    acronym: t03
+    description: Maximum value for t00
+    address: 60005
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 30.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_PULLDOWN_STARTUP_EN
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Pulldown at startup
+    acronym: t04
+    description: If enabled, trigger a pulldown at startup even if compartment temperature is below t06.
+    address: 60006
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_PULLDOWN_TEMP_TRIG
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Pulldown trigger temperature
+    acronym: t05
+    description: If compartment temperature goes above t06, enters pulldown state
+    address: 60007
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 8.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_PULLDOWN_SPEED
+    type: integer
+    unit: RPM
+    name: Pulldown speed
+    acronym: t06
+    description: Compressor speed during pulldown
+    address: 60008
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 4500.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_RECOVERY_DELTA_TEMP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature recovery offset
+    acronym: t07
+    description: Offset temperature below default for recovery termination. On-Off from cut-out and VCC from SP
+    address: 60009
+    min_value: 0.0
+    max_value: 10.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+    is_delta: true
+  - id: PARAM_TH_PROBE_FAULT_ON_TIME
+    type: integer
+    unit: min
+    name: 'Faulty probe: ON time'
+    acronym: t08
+    description: Time ON when cabinet probe is unavailable, work with fixed duty cycle
+    address: 60010
+    min_value: 1.0
+    max_value: 600.0
+    default_value: 15.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_PROBE_FAULT_OFF_TIME
+    type: integer
+    unit: min
+    name: 'Faulty probe: OFF time'
+    acronym: t09
+    description: Time OFF When cabinet probe is unavailable, work with fixed duty cycle
+    address: 60011
+    min_value: 1.0
+    max_value: 600.0
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_TH_PROBE_FAULT_SPEED
+    type: integer
+    unit: RPM
+    name: 'Faulty probe: Speed'
+    acronym: t10
+    description: Compressor speed when cabinet probe is unavailable, working with fixed duty cycle and fixed speed
+    address: 60012
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 3600.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_TH_PULLDOWN_TIMEOUT
+    type: integer
+    unit: hrs
+    name: Pulldown timeout
+    acronym: t11
+    description: '-'
+    address: 60140
+    min_value: 1.0
+    max_value: 999.0
+    default_value: 24.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COMP_CTRL_TYPE
+    type: enum
+    fields:
+    - index: 0
+      name: ON-OFF
+    - index: 1
+      name: Variable Speed
+    name: Compressor type
+    acronym: C00
+    description: Define if compressor is ON/OFF or VCC
+    address: 60013
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_COMP_MIN_OFF_TIME
+    type: integer
+    unit: min
+    name: Minimum OFF time
+    acronym: C01
+    description: Defines the minimum time the compressor must be off before starting. In case the compartment temperature
+      rise above cut-in before C01 time, the compressor will wait until C01 time is reached before starting. It is a compressor
+      reliability parameter, so it does not delay the fan starting control.
+    address: 60014
+    min_value: 0.0
+    max_value: 60.0
+    default_value: 3.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COMP_MIN_ON_TIME
+    type: integer
+    unit: min
+    name: Minimum ON time
+    acronym: C02
+    description: Defines the minimum time the compressor must be on before turning off to guarantee oil return and lubrication.
+      In case the compartment temperature fall below cut-off C02 time, the compressor will continue on until C02 time is reached.
+      If any alarm is configured to turn off compressor it overwrites the C02 rule.
+    address: 60015
+    min_value: 0.0
+    max_value: 60.0
+    default_value: 3.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COMP_MIN_START_PERIOD
+    type: integer
+    unit: min
+    name: Consecutive start minimum time
+    acronym: C03
+    description: Defines the time between two consecutive compressor starts. It is related to compressor and electricals reliability
+      to avoid high cycle rate. It is an additional rule to C01 and C02 and will be active only if C03 < C01+C02.
+    address: 60016
+    min_value: 0.0
+    max_value: 60.0
+    default_value: 6.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TYPE
+    type: enum
+    fields:
+    - index: 0
+      name: Disabled
+    - index: 1
+      name: Heater
+    - index: 2
+      name: Hotgas
+    - index: 3
+      name: Off-Cycle
+    name: Defrost type
+    acronym: d00
+    description: Defines the defrost type
+    address: 60017
+    min_value: 0.0
+    max_value: 3.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TIMEOUT_VALUE
+    type: integer
+    unit: min
+    name: Defrost timeout
+    acronym: d01
+    description: Define the maximum defrost duration, if the timeout d01 is reached the defrost is terminated even if defrost
+      termination temperature is not reached.
+    address: 60018
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 30.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_EVAP_TEMP_VALUE
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Defrost termination temperature
+    acronym: d02
+    description: Define the evaporator temperature for defrost end. In case of two evaporator probes, both must reach it to
+      end the defrost.
+    address: 60019
+    min_value: -50.0
+    max_value: 50.0
+    default_value: 12.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_MAX_EVAP_TEMP_VALUE
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature that finishes a defrost if any evaporator probe reaches it
+    acronym: d03
+    description: Define the evaporator temperature for defrost end. In case of two evaporator probes, any of them reaching
+      it will end the defrost.
+    address: 60020
+    min_value: -50.0
+    max_value: 50.0
+    default_value: 25.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_DRIPPING_PERIOD
+    type: integer
+    unit: min
+    name: Dripping time
+    acronym: d04
+    description: Define the post defrost dripping time with all loads turned off. Exception when auxiliary relay is configured
+      so at parameter d24.
+    address: 60021
+    min_value: 0.0
+    max_value: 99.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TRIG
+    type: enum
+    fields:
+    - index: 0
+      name: Periodic time
+    - index: 1
+      name: Cumulative compressor ON time
+    - index: 2
+      name: RTC scheduled defrosts
+    - index: 3
+      name: Adaptive defrost
+    name: Defrost trigger
+    acronym: d05
+    description: Defines which is the main defrost starting trigger.
+    address: 60022
+    min_value: 0.0
+    max_value: 3.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TRIG_PERIOD
+    type: integer
+    unit: hrs
+    name: Fixed period trigger
+    acronym: d06
+    description: '
+
+      Period since last defrost after each the next defrost will be triggered when cycle cut-out is reached. The same parameter
+      is used for both "Periodic time" and "Cumulative compressor ON time" triggers'
+    address: 60023
+    min_value: 0.0
+    max_value: 500.0
+    default_value: 6.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TRIG_MAX_PERIOD
+    type: integer
+    unit: hrs
+    name: Max period between defrosts
+    acronym: d07
+    description: When this period between defrosts is reached a defrost is forced, independent of the cabinet temperature.
+      The same parameter is used for both "Periodic time" and "Cumulative compressor ON time" triggers
+    address: 60024
+    min_value: 1.0
+    max_value: 500.0
+    default_value: 6.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TRIG_PERIOD_PULLDOWN
+    type: integer
+    unit: hrs
+    name: Pulldown defrost period
+    acronym: d08
+    description: Controller enters a Pull Down state in case compartment temperature is above parameter t06. It is possible
+      to configure a different fixed defrost period during the Pull Down State.
+    address: 60025
+    min_value: 1.0
+    max_value: 500.0
+    default_value: 6.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TRIG_SCHED_TIME_1
+    type: restricted_hour
+    unit: hrs:min/10
+    name: RTC defrost trigger 1
+    acronym: d09
+    description: 'Defines the fixed hours for RTC defrost triger 1 (used when d05 = 2). The first two digits represent the
+      hour and the last digit represents tens of minutes for 24h hour scale. E.g.: [065 -> 06:50] / [096 -> Invalid, will
+      not trigger] / [123 -> 12:30] / [189 -> Invalid, will not trigger] / [210 -> 21:00]'
+    address: 60026
+    min_value: 0.0
+    max_value: 235.0
+    default_value: 10.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16384
+  - id: PARAM_DEF_TRIG_SCHED_TIME_2
+    type: restricted_hour
+    unit: hrs:min/10
+    name: RTC defrost trigger 2
+    acronym: d10
+    description: 'Defines the fixed hours for RTC defrost triger 2 (used when d05 = 2). The first two digits represent the
+      hour and the last digit represents tens of minutes for 24h hour scale. E.g.: [065 -> 06:50] / [096 -> Invalid, will
+      not trigger] / [123 -> 12:30] / [189 -> Invalid, will not trigger] / [210 -> 21:00]'
+    address: 60027
+    min_value: 0.0
+    max_value: 235.0
+    default_value: 70.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16384
+  - id: PARAM_DEF_TRIG_SCHED_TIME_3
+    type: restricted_hour
+    unit: hrs:min/10
+    name: RTC defrost trigger 3
+    acronym: d11
+    description: 'Defines the fixed hours for RTC defrost triger 3 (used when d05 = 2). The first two digits represent the
+      hour and the last digit represents tens of minutes for 24h hour scale. E.g.: [065 -> 06:50] / [096 -> Invalid, will
+      not trigger] / [123 -> 12:30] / [189 -> Invalid, will not trigger] / [210 -> 21:00]'
+    address: 60028
+    min_value: 0.0
+    max_value: 235.0
+    default_value: 130.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16384
+  - id: PARAM_DEF_TRIG_SCHED_TIME_4
+    type: restricted_hour
+    unit: hrs:min/10
+    name: RTC defrost trigger 4
+    acronym: d12
+    description: 'Defines the fixed hours for RTC defrost triger 4 (used when d05 = 2). The first two digits represent the
+      hour and the last digit represents tens of minutes for 24h hour scale. E.g.: [065 -> 06:50] / [096 -> Invalid, will
+      not trigger] / [123 -> 12:30] / [189 -> Invalid, will not trigger] / [210 -> 21:00]'
+    address: 60029
+    min_value: 0.0
+    max_value: 235.0
+    default_value: 190.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16384
+  - id: PARAM_DEF_ADP_DELTA_TRIG
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Adaptive defrost delta trigger
+    acronym: d13
+    description: Define the temperature difference in evaporator to trigger adaptive defrost (d05 = 3). The d13 is the difference
+      between clean evaporator (after defrost) and evaporator with ice formation. It should be configured to guaranteee effective
+      evaporator performance, a margin to critical ice formation or partial blockage.
+    address: 60030
+    min_value: 0.1
+    max_value: 20.0
+    default_value: 3.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4194304
+    is_delta: true
+  - id: PARAM_DEF_ADP_FILTER_LEVEL
+    type: integer
+    unit: min
+    name: Adaptive defrost filter 1*
+    acronym: d14
+    description: '-'
+    address: 60031
+    min_value: 0.0
+    max_value: 15.0
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4194304
+  - id: PARAM_DEF_ADP_STAB_FILTER_PERIOD
+    type: integer
+    unit: min
+    name: Adaptive defrost filter 2*
+    acronym: d15
+    description: '-'
+    address: 60032
+    min_value: 1.0
+    max_value: 999.0
+    default_value: 10.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4194304
+  - id: PARAM_DEF_ADP_TRIG_MIN_PERIOD
+    type: integer
+    unit: hrs
+    name: Min defrost period
+    acronym: d16
+    description: Define the minimum defrost period for two consecutive adaptive defrost triggers. If adaptive defrost is triggered
+      before d16 time, the defrost will start only after d16.
+    address: 60033
+    min_value: 1.0
+    max_value: 100.0
+    default_value: 3.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4194304
+  - id: PARAM_DEF_MAX_COMP_ON_PERIOD
+    type: integer
+    unit: min
+    name: Continuous compressor defrost trigger
+    acronym: d17
+    description: Define the continuoust compressor on time to trigger a defrost. It is an auxiliary rule which is used for
+      all defrost trigger modes. Disabled if 0.
+    address: 60034
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_TRIG_STARTUP
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Defrost at startup
+    acronym: d18
+    description: Enables the execution of a defrost during startup if the initial evaporator temperature is above the "Defrost
+      end temperature value"
+    address: 60035
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_ABSOLUTE_TRIGGER
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature for defrost trigger by cold evaporator
+    acronym: d19
+    description: Define an absolute low evaporator temperature, below which a defrost is triggered. A low evaporator temperature
+      may indicate ice formation. The d19 should not be set to a a value expected to happen during normal operation.
+    address: 60036
+    min_value: -99.9
+    max_value: 0.0
+    default_value: -50.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_SPEED
+    type: integer
+    unit: RPM
+    name: Defrost speed
+    acronym: d20
+    description: Defines the VCC speed for Hot Gas Defrost (d00 = 2). Usually the most effective speed is the max speed. Rule
+      not used for other defrost types.
+    address: 60037
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 4500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_DEF_POST_DEFROST_SPEED
+    type: integer
+    unit: RPM
+    name: Defrost recovery speed
+    acronym: d21
+    description: Define the VCC speed after a defrost, for temperature recovery. Rule is active for any defrost type.
+    address: 60038
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 4500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_DEF_POST_DEFROST_TIMEOUT
+    type: integer
+    unit: min
+    name: Defrost recovery timeout
+    acronym: d22
+    description: Duration the VCC will run at the defrost recovery speed (d21). After d22 time it will switch to normal control.
+    address: 60039
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 60.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_PRE_DEF_PERIOD
+    type: integer
+    unit: min
+    name: Pre-defrost duration
+    acronym: d23
+    description: Pre-defrost duration, where the compressor is kept OFF
+    address: 60040
+    min_value: 0.0
+    max_value: 99.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_AUX_LOAD_CFG
+    type: enum
+    fields:
+    - index: 0
+      name: Disabled
+    - index: 1
+      name: ON during DEFROST
+    - index: 2
+      name: ON during DRIPPING
+    - index: 3
+      name: ON during DEFROST & DRIPPING
+    - index: 4
+      name: ON during PRE-DEFROST
+    - index: 5
+      name: ON during PRE-DEFROST & DEFROST
+    - index: 6
+      name: ON during PRE-DEFROST & DEFROST & DRIPPING
+    name: Auxiliary defrost relay behavior
+    acronym: d24
+    description: Define if the auxiliary relay is on during pre-defrost, defrost and/or dripping.
+    address: 60041
+    min_value: 0.0
+    max_value: 6.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEF_IHM_TEMP
+    type: enum
+    fields:
+    - index: 0
+      name: Temperature at defrost start
+    - index: 1
+      name: Set point
+    - index: 2
+      name: Real temperature
+    - index: 3
+      name: Display DFR
+    name: Display behaviour during defrost
+    acronym: d25
+    description: The display may behave different from displaying compartment temperature during defrost and recovery.
+    address: 60042
+    min_value: 0.0
+    max_value: 3.0
+    default_value: 3.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_DEF_IHM_TEMP_DELTA
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature differential to end defrost display
+    acronym: d26
+    description: The display may behave different from displaying compartment temperature during defrost and recovery.
+    address: 60043
+    min_value: 0.0
+    max_value: 30.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+    is_delta: true
+  - id: PARAM_DEF_IHM_TIMEOUT_VALUE
+    type: integer
+    unit: min
+    name: Timeout to end defrost display
+    acronym: d27
+    description: The display may behave different from displaying compartment temperature during defrost and recovery.
+    address: 60044
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 15.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_EVAP_MODE
+    type: enum
+    fields:
+    - index: 0
+      name: Always ON
+    - index: 1
+      name: Synchronous to the compressor
+    - index: 2
+      name: Synchronous, pulsed when compressor is OFF
+    name: Evap fan operating mode
+    acronym: F00
+    description: '-'
+    address: 60045
+    min_value: 0.0
+    max_value: 2.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_EVAP_DEF_STATE
+    type: enum
+    fields:
+    - index: 0
+      name: 'OFF'
+    - index: 1
+      name: Follows normal control
+    - index: 2
+      name: 'ON'
+    name: Evap fan defrost state
+    acronym: F01
+    description: '-'
+    address: 60046
+    min_value: 0.0
+    max_value: 2.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_EVAP_DELAY_POST_DEF
+    type: integer
+    unit: min
+    name: Evap fan post-defrost delay
+    acronym: F02
+    description: '-'
+    address: 60047
+    min_value: 0.0
+    max_value: 60.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_EVAP_ON_TEMP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature to allow evap fan ON
+    acronym: F03
+    description: Evaporator temperature below which the evap. fan is enabled
+    address: 60048
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 45.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_EVAP_OFF_DELTA_TEMP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Differential temperature to cut-out evap fan
+    acronym: F04
+    description: Evaporator temperature above FE3 that disables the evap. fan
+    address: 60049
+    min_value: 1.0
+    max_value: 99.9
+    default_value: 10.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+    is_delta: true
+  - id: PARAM_EVAP_PULSED_ON_TIME
+    type: integer
+    unit: min
+    name: Evap fan pulsed time ON
+    acronym: F05
+    description: Time the evaporator fan is ON when FE0 = 2 and the compressor is OFF
+    address: 60050
+    min_value: 1.0
+    max_value: 99.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_EVAP_PULSED_OFF_TIME
+    type: integer
+    unit: min
+    name: Evap fan pulsed time OFF.
+    acronym: F06
+    description: Time the evaporator fan is OFF when FE0 = 2 and the compressor is OFF
+    address: 60051
+    min_value: 1.0
+    max_value: 99.0
+    default_value: 4.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_EVAP_CTRL_TYPE
+    type: enum
+    fields:
+    - index: 0
+      name: ON-OFF
+    - index: 1
+      name: Variable Speed
+    name: Evap fan type
+    acronym: F07
+    description: Define if evaporator fan is ON/OFF or Variable speed
+    address: 60143
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_CTRL_MODE
+    type: enum
+    fields:
+    - index: 0
+      name: Basic
+    - index: 1
+      name: Full Speed
+    name: Evap fan Control mode
+    acronym: F08
+    description: Selects how to control the variable speed evap fan
+    address: 60170
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_RATE
+    type: integer
+    unit: RPM/min
+    name: Evap fan speed rate of change
+    acronym: F09
+    description: Maximum rate of speed change for the variable speed evaporator fan
+    address: 60171
+    min_value: 0.0
+    max_value: 10000.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_STANDBY_SPD
+    type: integer
+    unit: RPM
+    name: Evap fan standby speed
+    acronym: F10
+    description: Fan speed when compressor is OFF and fan ON (e.g. pulsed fan during off or fan always ON)
+    address: 60172
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 800.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_CYCLE_SPD
+    type: integer
+    unit: RPM
+    name: Evap fan cycle speed
+    acronym: F11
+    description: Fan speed when cooling state and compressor ON
+    address: 60173
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 1200.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_RECOVERY_SPD
+    type: integer
+    unit: RPM
+    name: Evap fan recovery speed
+    acronym: F12
+    description: Fan speed when cooling state and internal temperature above t00+t01+F15
+    address: 60174
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 1500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_DEFROST_SPD
+    type: integer
+    unit: RPM
+    name: Evap fan defrost speed
+    acronym: F13
+    description: Fans speed during defrost state, in case fan is configured ON during defrost.
+    address: 60175
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 1800.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_PULLDOWN_SPD
+    type: integer
+    unit: RPM
+    name: Evap fan pulldown speed
+    acronym: F14
+    description: Fan speed during pull down state, by internal temperature above t05
+    address: 60176
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 2000.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_RECOVERY_DELTA_TEMP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Evap fan variable speed delta temperature for recovery
+    acronym: F15
+    description: Delta temperature above
+    address: 60177
+    min_value: 0.0
+    max_value: 50.0
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+    is_delta: true
+  - id: PARAM_EVAP_FAN_VAR_MIN_DELTA_TEMP_CTRL
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Evap fan - Full Speed - Min temperature for temperature rule - Delta above setpoint
+    acronym: F16
+    description: Delta temperature above setpoint for evaporator fan proportional (FULL) control at F11 speed
+    address: 60178
+    min_value: 0.0
+    max_value: 50.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+    is_delta: true
+  - id: PARAM_EVAP_FAN_VAR_MAX_TEMP_CTRL
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Evap fan - Full Speed - Max temperature for temperature rule
+    acronym: F17
+    description: Package or internal temperature at which the proportional (FULL) evaporation fan controls at F14
+    address: 60179
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_MIN_COMP_CTRL
+    type: integer
+    unit: RPM
+    name: Evap fan - Full Speed - Min compressor speed for compressor rule
+    acronym: F18
+    description: Min compressor speed for evaporator fan proportional speed control
+    address: 60215
+    min_value: 0.0
+    max_value: 7000.0
+    default_value: 1500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_VAR_MAX_COMP_CTRL
+    type: integer
+    unit: RPM
+    name: Evap fan - Full Speed - Max compressor speed for compressor rule
+    acronym: F19
+    description: Max compressor speed for evaporator fan proportional speed control
+    address: 60216
+    min_value: 0.0
+    max_value: 7000.0
+    default_value: 4500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_DOOR_REV_TIME
+    type: integer
+    unit: sec
+    name: Evap fan - Time in reverse when door opens
+    acronym: F20
+    description: Evap fan - Time in reverse when door opens
+    address: 60226
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 33554432
+  - id: PARAM_EVAP_FAN_DOOR_STANDBY_TIME
+    type: integer
+    unit: sec
+    name: Evap fan - Time in stanby speed when door closes
+    acronym: F21
+    description: Evap fan - Time in stanby speed when door closes
+    address: 60227
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_MODE
+    type: enum
+    fields:
+    - index: 0
+      name: Always ON
+    - index: 1
+      name: Always ON  & temperature min rules
+    - index: 2
+      name: Synchronous to the compressor
+    - index: 3
+      name: Synchronous to the compressor & temperature max/min rules
+    name: Cond fan operating mode
+    acronym: F50
+    description: '-'
+    address: 60052
+    min_value: 0.0
+    max_value: 3.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COND_COMP_ON_DELAY
+    type: integer
+    unit: sec
+    name: Cond fan synchronous ON delay
+    acronym: F51
+    description: Delay between turning the compressor ON and turning the condenser fan ON
+    address: 60053
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COND_COMP_OFF_DELAY
+    type: integer
+    unit: sec
+    name: Cond fan synchronous OFF delay
+    acronym: F52
+    description: Delay between turning the compressor OFF and turning the condenser fan OFF
+    address: 60054
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COND_DEF_STATE
+    type: enum
+    fields:
+    - index: 0
+      name: 'OFF'
+    - index: 1
+      name: Follows normal control
+    name: Cond fan defrost state
+    acronym: F53
+    description: '-'
+    address: 60055
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COND_ON_TEMP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature above which the fan is ON
+    acronym: F54
+    description: Follows FC0 as default. But if T.cd > FC4, the fan will be forced to turn ON
+    address: 60056
+    min_value: 30.0
+    max_value: 99.9
+    default_value: 40.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COND_OFF_TEMP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature to cond fan forced OFF
+    acronym: F55
+    description: Follows FC0 as default. But if T.cd < FC5, the fan will be forced to turn OFF
+    address: 60057
+    min_value: 0.0
+    max_value: 60.0
+    default_value: 25.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COND_CTRL_TYPE
+    type: enum
+    fields:
+    - index: 0
+      name: ON-OFF
+    - index: 1
+      name: Variable Speed
+    name: Cond fan type
+    acronym: F56
+    description: Define if condenser fan is ON/OFF or Variable speed
+    address: 60144
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_CTRL_MODE
+    type: enum
+    fields:
+    - index: 0
+      name: Basic
+    - index: 1
+      name: Full Speed
+    name: Cond fan Control mode
+    acronym: F57
+    description: Selects how to control the variable speed cond fan
+    address: 60180
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_RATE
+    type: integer
+    unit: RPM/min
+    name: Cond fan speed rate of change
+    acronym: F58
+    description: Maximum rate of speed change for the variable speed Condorator fan
+    address: 60181
+    min_value: 0.0
+    max_value: 10000.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_STANDBY_SPD
+    type: integer
+    unit: RPM
+    name: Cond fan standby speed
+    acronym: F59
+    description: Fan speed when compressor is OFF and fan ON (according to F50)
+    address: 60182
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 800.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_CYCLE_SPD
+    type: integer
+    unit: RPM
+    name: Cond fan cycle speed
+    acronym: F60
+    description: Fan speed when cooling state and compressor ON
+    address: 60183
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 1200.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_RECOVERY_SPD
+    type: integer
+    unit: RPM
+    name: Cond fan recovery speed
+    acronym: F61
+    description: Fan speed when cooling state and compressor speed above F64
+    address: 60184
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 1500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_DEFROST_SPD
+    type: integer
+    unit: RPM
+    name: Cond fan defrost speed
+    acronym: F62
+    description: Condenser speed during defrost state
+    address: 60185
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 1800.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_PULLDOWN_SPD
+    type: integer
+    unit: RPM
+    name: Cond fan pulldown speed
+    acronym: F63
+    description: Condenser speed during pull down state (internal temperature > t05)
+    address: 60186
+    min_value: 600.0
+    max_value: 3000.0
+    default_value: 2000.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_RECOVERY_COMP_SPD
+    type: integer
+    unit: RPM
+    name: Cond fan compressor speed for recovery
+    acronym: F64
+    description: Compressor speed above which, during cycle, it is considered recovery.
+    address: 60187
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 2500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_MIN_TEMP_CTRL
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Cond fan - Full Speed - Min temperature for temperature rule
+    acronym: F65
+    description: Condenser probe temperature at which the condenser fan proportional control (FULL) is at F60 speed
+    address: 60188
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 45.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_MAX_TEMP_CTRL
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Cond fan - Full Speed - Max temperature for temperature rule
+    acronym: F66
+    description: Condenser probe temperature at which the condenser fan proportional control (FULL) is at F63 speed
+    address: 60189
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 55.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_MIN_COMP_CTRL
+    type: integer
+    unit: RPM
+    name: Cond fan - Full Speed - Min compressor speed for compressor rule
+    acronym: F67
+    description: Min compressor speed for condenser fan proportional speed control
+    address: 60217
+    min_value: 0.0
+    max_value: 7000.0
+    default_value: 1500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_COND_FAN_VAR_MAX_COMP_CTRL
+    type: integer
+    unit: RPM
+    name: Cond fan - Full Speed - Max compressor speed for compressor rule
+    acronym: F68
+    description: Max compressor speed for condenser fan proportional speed control
+    address: 60218
+    min_value: 0.0
+    max_value: 7000.0
+    default_value: 4500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 33554432
+  - id: PARAM_DOOR_HEAT_MODE
+    type: enum
+    fields:
+    - index: 0
+      name: Always ON
+    - index: 1
+      name: Differential to ambient
+    - index: 2
+      name: Fixed Duty Cycle
+    name: Door heater operating mode
+    acronym: dH0
+    description: '-'
+    address: 60058
+    min_value: 0.0
+    max_value: 2.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DOOR_HEAT_DELTA_TO_AMB
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Differential to ambient temperature
+    acronym: dH1
+    description: When dh0 = 1, the door heater is controlled to keep T.door between "T.amb-dH1" and T.amb-dH1+dH2
+    address: 60059
+    min_value: 0.0
+    max_value: 20.0
+    default_value: 3.8
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16777216
+    is_delta: true
+  - id: PARAM_DOOR_HEAT_HYST
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Door heater control hysteresis
+    acronym: dH2
+    description: When dh0 = 1, the door heater is controlled to keep T.door between "T.amb-dH1" and T.amb-dH1+dH2
+    address: 60060
+    min_value: 2.0
+    max_value: 10.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16777216
+    is_delta: true
+  - id: PARAM_DOOR_HEAT_DUTY_CYCLE
+    type: integer
+    unit: '%'
+    name: Door heater control fixed duty cycle
+    acronym: dH3
+    description: Fixed duty-cycle to allow energy savings in the door heater.
+    address: 60061
+    min_value: 10.0
+    max_value: 90.0
+    default_value: 50.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DOOR_HEAT_TEMP_CTRL_EN
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Enable cut-off by high internal temperature
+    acronym: dH4
+    description: Parameter defining if the door resistance should be turned OFF if the internal temperature is above the internal
+      temperature alarm threshold
+    address: 60062
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_LIGHTS_TEMP_CTRL_EN
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Lights OFF temperature control mode
+    acronym: Lot
+    description: Parameter defining if the lights should be turned OFF if the internal temperature is above the internal temperature
+      alarm threshold
+    address: 60063
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_VCC_SPEED_MAX
+    type: integer
+    unit: RPM
+    name: Max running speed
+    acronym: v00
+    description: The parameter allows to narrow the VCC maximum running speed to a value below the model max speed. In case
+      v00 is set above the model max speed, the model max speed will be used. It might be desired to avoid high noise in the
+      appliance.
+    address: 60064
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 4500.0
+    read_access_level: 2
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_VCC_SPEED_MIN
+    type: integer
+    unit: RPM
+    name: Min running speed
+    acronym: v01
+    description: The parameter allows to narrow the VCC minimum running speed to a value above the model min speed. In case
+      v01 is set below the model min speed, the model min speed will be used. It might be desired to guarantee that min compressor
+      cooling capacity is suitable to the appliance.
+    address: 60065
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 1800.0
+    read_access_level: 2
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_VCC_RPM_HZ
+    type: integer
+    unit: RPM/Hz
+    name: Frequency control gain
+    acronym: v02
+    description: When controlling the compressor via frequency, it is necessary to define the speed gain of the inverter in
+      RPM/Hz
+    address: 60066
+    min_value: 1.0
+    max_value: 999.0
+    default_value: 30.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 8192
+  - id: PARAM_VCC_CTRL_MODE
+    type: enum
+    fields:
+    - index: 0
+      name: Fixed Speed - Frequency
+    - index: 1
+      name: Fixed Speed - Serial
+    - index: 2
+      name: PID - Frequency
+    - index: 3
+      name: PID - Serial
+    - index: 4
+      name: TTO - Frequency
+    - index: 5
+      name: TTO - Serial
+    - index: 6
+      name: SVS - Serial
+    name: VCC control mode
+    acronym: v03
+    description: Define control mode and interface
+    address: 60067
+    min_value: 0.0
+    max_value: 6.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_VCC_KP
+    type: integer
+    unit: RPM/K
+    name: Proportional gain (Kp)
+    acronym: v04
+    description: '-'
+    address: 60068
+    min_value: 0.0
+    max_value: 4000.0
+    default_value: 60.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3670016
+  - id: PARAM_VCC_KI
+    type: integer
+    unit: RPM/(K*sec)
+    name: Integral gain (Ki)
+    acronym: v05
+    description: '-'
+    address: 60069
+    min_value: 0.0
+    max_value: 4000.0
+    default_value: 500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 2621440
+  - id: PARAM_VCC_KD
+    type: integer
+    unit: sec*RPM/K
+    name: Derivative gain (Kd)
+    acronym: v06
+    description: '-'
+    address: 60070
+    min_value: 0.0
+    max_value: 2000.0
+    default_value: 60.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 2621440
+  - id: PARAM_VCC_CYCLE_END_STAB_TIME
+    type: integer
+    unit: min
+    name: Stabilization Time After reaching Setpoint
+    acronym: v07
+    description: Time below setpoint to end a cooling cycle.
+    address: 60071
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 2621440
+  - id: PARAM_VCC_TTO
+    type: integer
+    unit: min
+    name: Target Time On (TTO)
+    acronym: v08
+    description: Target Time On used by TTO control and SVS.
+    address: 60072
+    min_value: 5.0
+    max_value: 999.0
+    default_value: 45.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3670016
+  - id: PARAM_VCC_TTO_TIMEOUT
+    type: integer
+    unit: min
+    name: TTO Timeout
+    acronym: v09
+    description: Time after TTO in a cycle to increase speed. Used by TTO control.
+    address: 60073
+    min_value: 5.0
+    max_value: 999.0
+    default_value: 15.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 1048576
+  - id: PARAM_VCC_MSS
+    type: integer
+    unit: RPM
+    name: Minimum Speed Step (MSS)
+    acronym: v10
+    description: Speed granularity used by TTO control.
+    address: 60074
+    min_value: 50.0
+    max_value: 500.0
+    default_value: 100.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 1048576
+    is_delta: true
+  - id: PARAM_VCC_DISTURB_TIME
+    type: integer
+    unit: min
+    name: VCC control disturb time
+    acronym: v11
+    description: Time outside control range to define a disturbance. Used by TTO control.
+    address: 60075
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 1572864
+  - id: PARAM_VCC_SHORT_CYCLE_DAMPENING
+    type: integer
+    unit: '%'
+    name: VCC short cycle damping
+    acronym: v12
+    description: '-'
+    address: 60141
+    min_value: 0.0
+    max_value: 100.0
+    default_value: 60.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 524288
+  - id: PARAM_VCC_TRANSITION_TIME
+    type: integer
+    unit: min
+    name: Recovery transition time
+    acronym: v13
+    description: '-'
+    address: 60142
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_VCC_CUT_OFF_DELTA
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Delta below set-point for forced cut-out
+    acronym: v14
+    description: '-'
+    address: 60193
+    min_value: 0.0
+    max_value: 40.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_VCC_FIXED_SPEED_SPEED
+    type: integer
+    unit: RPM
+    name: Compressor speed for fixed speed mode
+    acronym: v15
+    description: '-'
+    address: 60194
+    min_value: 1000.0
+    max_value: 7000.0
+    default_value: 4500.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_ALARM_HIGH_INT_TEMP_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: High cabinet temperature config.
+    acronym: A00
+    description: 'Alarm logic: Cabinet temperature above A01 for more than A02 minutes. Time is not counted for the first
+      A03 minutes after controllet turn on and the first A04 minutes after a defrost.'
+    address: 60076
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_INT_TEMP_VALUE
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: High internal temperature threshold
+    acronym: A01
+    description: 'Alarm logic: Cabinet temperature above A01 for more than A02 minutes. Time is not counted for the first
+      A03 minutes after controllet turn on and the first A04 minutes after a defrost.'
+    address: 60077
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 15.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_INT_TEMP_DELAY
+    type: integer
+    unit: min
+    name: High internal temperature delay
+    acronym: A02
+    description: 'Alarm logic: Cabinet temperature above A01 for more than A02 minutes. Time is not counted for the first
+      A03 minutes after controllet turn on and the first A04 minutes after a defrost.'
+    address: 60078
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 30.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_INT_TEMP_STARTUP_DELAY
+    type: integer
+    unit: min
+    name: High internal temperature delay after startup
+    acronym: A03
+    description: 'Alarm logic: Cabinet temperature above A01 for more than A02 minutes. Time is not counted for the first
+      A03 minutes after controllet turn on and the first A04 minutes after a defrost.'
+    address: 60079
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 360.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_INT_TEMP_DEFROST_DELAY
+    type: integer
+    unit: min
+    name: High internal temperature delay after defrost
+    acronym: A04
+    description: 'Alarm logic: Cabinet temperature above A01 for more than A02 minutes. Time is not counted for the first
+      A03 minutes after controllet turn on and the first A04 minutes after a defrost.'
+    address: 60080
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 60.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_INT_TEMP_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: Low cabinet temperature config.
+    acronym: A05
+    description: 'Alarm logic: Cabinet temperature below A06 for more than A07 minutes.'
+    address: 60081
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_INT_TEMP_VALUE
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Low cabinet temperature threshold
+    acronym: A06
+    description: 'Alarm logic: Cabinet temperature below A06 for more than A07 minutes.'
+    address: 60082
+    min_value: -99.9
+    max_value: 99.9
+    default_value: -10.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_INT_TEMP_DELAY
+    type: integer
+    unit: min
+    name: Low cabinet temperature delay
+    acronym: A07
+    description: 'Alarm logic: Cabinet temperature below A06 for more than A07 minutes.'
+    address: 60083
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_COND_TEMP_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    - index: 3
+      name: Reserved
+    - index: 4
+      name: Turn compressor OFF
+    - index: 5
+      name: Turn evaporator fan OFF
+    - index: 6
+      name: Turn condenser fan OFF
+    name: High condenser temperature config.
+    acronym: A08
+    description: 'Alarm logic: Condenser temperature above A09 for more than A10 minutes.'
+    address: 60084
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_COND_TEMP_VALUE
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: High condenser temperature threshold
+    acronym: A09
+    description: 'Alarm logic: Condenser temperature above A09 for more than A10 minutes.'
+    address: 60085
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 70.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_COND_TEMP_DELAY
+    type: integer
+    unit: min
+    name: High condenser temperature delay
+    acronym: A10
+    description: 'Alarm logic: Condenser temperature above A09 for more than A10 minutes.'
+    address: 60086
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_CAPACITY_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: Low capacity temperature config.
+    acronym: A11
+    description: 'Alarm logic: No cut-off cycle ocurring for A12 hours.'
+    address: 60087
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_CAPACITY_PERIOD
+    type: integer
+    unit: hrs
+    name: Low capacity alarm period
+    acronym: A12
+    description: 'Alarm logic: No cut-off cycle ocurring for A12 hours.'
+    address: 60088
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 16.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_EXT_IN_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: External digital input config.
+    acronym: A13
+    description: 'Alarm logic: If any input is configured to trigger an external alarm and its correspondent input reaches
+      the activated polarity for more than A14 seconds.'
+    address: 60089
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_EXT_IN_DELAY
+    type: integer
+    unit: sec
+    name: External digital alarm delay
+    acronym: A14
+    description: 'Alarm logic: If any input is configured to trigger an external alarm and its correspondent input reaches
+      the activated polarity for more than A14 seconds.'
+    address: 60090
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_DOOR_OPEN_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: Opened door config.
+    acronym: A15
+    description: Alarm logic:If any input is configured to trigger the door opened alarm and its correspondent input reaches
+      the activated polarity for more than A16 seconds.
+    address: 60091
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_DOOR_OPEN_DELAY
+    type: integer
+    unit: sec
+    name: Opened door alarm delay
+    acronym: A16
+    description: 'Alarm logic: If any input is configured to trigger the door opened alarm and its correspondent input reaches
+      the activated polarity for more than A16 seconds.'
+    address: 60092
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 120.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_PROBE_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: Faulty probe config.
+    acronym: A17
+    description: 'Alarm logic: If any configured probe is not connected or short circuited.'
+    address: 60093
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_INV_COMM_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: Inverter serial fault config.
+    acronym: A18
+    description: 'Alarm logic: If the compressor is configured as variable speed, serial communication, but the communication
+      is faulty, trigger the alarm'
+    address: 60094
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 5.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 3932160
+  - id: PARAM_ALARM_DEFROST_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: Defrost error config.
+    acronym: A19
+    description: 'Alarm logic: A defrost should finish based on evaporator temperature but ended by timeout.'
+    address: 60095
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_RTC_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    name: Clock not adjusted config.
+    acronym: A20
+    description: 'Alarm logic: Clock was not adjusted.'
+    address: 60096
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16384
+  - id: PARAM_ALARM_HIGH_AUX_TEMP_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    - index: 3
+      name: Reserved
+    - index: 4
+      name: Turn compressor OFF
+    - index: 5
+      name: Turn evaporator fan OFF
+    - index: 6
+      name: Turn condenser fan OFF
+    name: High auxiliar temperature config
+    acronym: A21
+    description: 'Alarm logic: Auxiliar temperature above A22 for more than A23 minutes.'
+    address: 60097
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_AUX_TEMP_VALUE
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: High auxiliar temperature threshold
+    acronym: A22
+    description: 'Alarm logic: Auxiliar temperature above A22 for more than A23 minutes.'
+    address: 60098
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 15.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_HIGH_AUX_TEMP_DELAY
+    type: integer
+    unit: min
+    name: High auxiliar temperature delay
+    acronym: A23
+    description: 'Alarm logic: Auxiliar temperature above A22 for more than A23 minutes.'
+    address: 60099
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 30.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_AUX_TEMP_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    - index: 3
+      name: Reserved
+    - index: 4
+      name: Turn compressor OFF
+    - index: 5
+      name: Turn evaporator fan OFF
+    - index: 6
+      name: Turn condenser fan OFF
+    name: Low auxiliar temperature config
+    acronym: A24
+    description: 'Alarm logic: Auxiliar temperature below A25 for more than A26 minutes.'
+    address: 60100
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_AUX_TEMP_VALUE
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Low auxiliar temperature threshold
+    acronym: A25
+    description: 'Alarm logic: Auxiliar temperature below A25 for more than A26 minutes.'
+    address: 60101
+    min_value: -99.9
+    max_value: 99.9
+    default_value: -10.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_LOW_AUX_TEMP_DELAY
+    type: integer
+    unit: min
+    name: Low auxiliar temperature delay
+    acronym: A26
+    description: 'Alarm logic: Auxiliar temperature below A25 for more than A26 minutes.'
+    address: 60102
+    min_value: 0.0
+    max_value: 999.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_BUS_VOLTAGE_CFG
+    type: bitwise
+    fields:
+    - index: 0
+      name: Enabled
+    - index: 1
+      name: Activate buzzer
+    - index: 2
+      name: Activate display message
+    - index: 3
+      name: Reserved
+    - index: 4
+      name: Turn compressor OFF
+    - index: 5
+      name: Turn evaporator fan OFF
+    - index: 6
+      name: Turn condenser fan OFF
+    name: Bus voltage alarm configuration
+    acronym: A27
+    description: 'Alarm logic: Either line voltage above A28 or below A30.'
+    address: 60219
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_BUS_VOLTAGE_HIGH
+    type: integer
+    unit: V
+    name: High voltage alarm threshold
+    acronym: A28
+    description: 'Alarm logic: Either line voltage above A28 or below A30.'
+    address: 60220
+    min_value: 0.0
+    max_value: 300.0
+    default_value: 300.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_BUS_VOLTAGE_HIGH_DELTA
+    type: integer
+    unit: V
+    name: High voltage alarm differential
+    acronym: A29
+    description: 'Alarm logic: Either line voltage above A28 or below A30.'
+    address: 60221
+    min_value: 0.0
+    max_value: 100.0
+    default_value: 10.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+    is_delta: true
+  - id: PARAM_ALARM_BUS_VOLTAGE_LOW
+    type: integer
+    unit: V
+    name: Low voltage alarm threshold
+    acronym: A30
+    description: 'Alarm logic: Either line voltage above A28 or below A30.'
+    address: 60222
+    min_value: 0.0
+    max_value: 300.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALARM_BUS_VOLTAGE_LOW_DELTA
+    type: integer
+    unit: V
+    name: Low voltage alarm differential
+    acronym: A31
+    description: 'Alarm logic: Either line voltage above A28 or below A30.'
+    address: 60223
+    min_value: 0.0
+    max_value: 100.0
+    default_value: 10.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+    is_delta: true
+  - id: PARAM_IN_MODE_1
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Digital Input
+    - index: 2
+      name: Cabinet
+    - index: 3
+      name: Evaporator
+    - index: 4
+      name: Condenser
+    - index: 5
+      name: Ambient
+    - index: 6
+      name: Door
+    - index: 7
+      name: Auxiliar
+    - index: 8
+      name: Evaporator 2
+    - index: 9
+      name: Product
+    name: Input 1 mode
+    acronym: I00
+    description: '-'
+    address: 60103
+    min_value: 0.0
+    max_value: 9.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 16
+  - id: PARAM_IN_MODE_2
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Digital Input
+    - index: 2
+      name: Cabinet
+    - index: 3
+      name: Evaporator
+    - index: 4
+      name: Condenser
+    - index: 5
+      name: Ambient
+    - index: 6
+      name: Door
+    - index: 7
+      name: Auxiliar
+    - index: 8
+      name: Evaporator 2
+    - index: 9
+      name: Product
+    name: Input 2 mode
+    acronym: I01
+    description: '-'
+    address: 60104
+    min_value: 0.0
+    max_value: 9.0
+    default_value: 3.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 32
+  - id: PARAM_IN_MODE_3
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Digital Input
+    - index: 2
+      name: Cabinet
+    - index: 3
+      name: Evaporator
+    - index: 4
+      name: Condenser
+    - index: 5
+      name: Ambient
+    - index: 6
+      name: Door
+    - index: 7
+      name: Auxiliar
+    - index: 8
+      name: Evaporator 2
+    - index: 9
+      name: Product
+    name: Input 3 mode
+    acronym: I02
+    description: '-'
+    address: 60105
+    min_value: 0.0
+    max_value: 9.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 64
+  - id: PARAM_IN_MODE_4
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Digital Input
+    - index: 2
+      name: Cabinet
+    - index: 3
+      name: Evaporator
+    - index: 4
+      name: Condenser
+    - index: 5
+      name: Ambient
+    - index: 6
+      name: Door
+    - index: 7
+      name: Auxiliar
+    - index: 8
+      name: Evaporator 2
+    - index: 9
+      name: Product
+    name: Input 4 mode
+    acronym: I03
+    description: '-'
+    address: 60106
+    min_value: 0.0
+    max_value: 9.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 128
+  - id: PARAM_IN_MODE_5
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Digital Input
+    - index: 2
+      name: Cabinet
+    - index: 3
+      name: Evaporator
+    - index: 4
+      name: Condenser
+    - index: 5
+      name: Ambient
+    - index: 6
+      name: Door
+    - index: 7
+      name: Auxiliar
+    - index: 8
+      name: Evaporator 2
+    - index: 9
+      name: Product
+    name: Input 5 mode
+    acronym: I04
+    description: '-'
+    address: 60107
+    min_value: 0.0
+    max_value: 9.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 256
+  - id: PARAM_PROBE_MODEL
+    type: enum
+    fields:
+    - index: 0
+      name: NIDEC default
+    - index: 1
+      name: Custom probe
+    name: Temperature sensor model
+    acronym: I05
+    description: '-'
+    address: 60108
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_PROBE_OFFSET_1
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Sensor 1 calibration (offset)
+    acronym: I06
+    description: T_considered = T_measured + T_offset
+    address: 60109
+    min_value: -10.0
+    max_value: 10.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16
+    is_delta: true
+  - id: PARAM_PROBE_OFFSET_2
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Sensor 2 calibration (offset)
+    acronym: I07
+    description: T_considered = T_measured + T_offset
+    address: 60110
+    min_value: -10.0
+    max_value: 10.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32
+    is_delta: true
+  - id: PARAM_PROBE_OFFSET_3
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Sensor 3 calibration (offset)
+    acronym: I08
+    description: T_considered = T_measured + T_offset
+    address: 60111
+    min_value: -10.0
+    max_value: 10.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 64
+    is_delta: true
+  - id: PARAM_PROBE_OFFSET_4
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Sensor 4 calibration (offset)
+    acronym: I09
+    description: T_considered = T_measured + T_offset
+    address: 60112
+    min_value: -10.0
+    max_value: 10.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 128
+    is_delta: true
+  - id: PARAM_PROBE_OFFSET_5
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Sensor 5 calibration (offset)
+    acronym: I10
+    description: T_considered = T_measured + T_offset
+    address: 60113
+    min_value: -10.0
+    max_value: 10.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 256
+    is_delta: true
+  - id: PARAM_CUSTOM_NTC_T_REF
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Custon NTC reference Temperature
+    acronym: I11
+    description: T_ref
+    address: 60114
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 25.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_CUSTOM_NTC_R_REF
+    type: unsigned integer
+    name: Custom NTC reference Resistance
+    acronym: I12
+    description: R_ref
+    address: 60115
+    min_value: 100.0
+    max_value: 999.0
+    default_value: 104.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_CUSTOM_NTC_BETA_A
+    type: unsigned integer
+    name: Custom NTC Beta param A
+    acronym: I13
+    description: Beta = -A*ln(R_ntc) + B
+    address: 60116
+    min_value: 0.0
+    max_value: 9999.0
+    default_value: 5991.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_CUSTOM_NTC_BETA_B
+    type: unsigned integer
+    name: Custom NTC Beta param B
+    acronym: I14
+    description: Beta = -A*ln(R_ntc) + B
+    address: 60117
+    min_value: 0.0
+    max_value: 9999.0
+    default_value: 3877.0
+    read_access_level: 1
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DIG_CONF_1
+    type: bitwise
+    fields:
+    - index: 0
+      name: Polarity Activated when closed
+    - index: 1
+      name: Turn evaporator fan OFF
+    - index: 2
+      name: Turn compressor OFF
+    - index: 3
+      name: Turn lights OFF
+    - index: 4
+      name: Trigger temporized door alarm
+    - index: 5
+      name: Trigger external alarm
+    - index: 6
+      name: Manual defrost trigger
+    name: Digital input 1 configuration
+    acronym: I15
+    description: '-'
+    address: 60118
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 16
+  - id: PARAM_DIG_CONF_2
+    type: bitwise
+    fields:
+    - index: 0
+      name: Polarity Activated when closed
+    - index: 1
+      name: Turn evaporator fan OFF
+    - index: 2
+      name: Turn compressor OFF
+    - index: 3
+      name: Turn lights OFF
+    - index: 4
+      name: Trigger temporized door alarm
+    - index: 5
+      name: Trigger external alarm
+    - index: 6
+      name: Manual defrost trigger
+    name: Digital input 2 configuration
+    acronym: I16
+    description: '-'
+    address: 60119
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32
+  - id: PARAM_DIG_CONF_3
+    type: bitwise
+    fields:
+    - index: 0
+      name: Polarity Activated when closed
+    - index: 1
+      name: Turn evaporator fan OFF
+    - index: 2
+      name: Turn compressor OFF
+    - index: 3
+      name: Turn lights OFF
+    - index: 4
+      name: Trigger temporized door alarm
+    - index: 5
+      name: Trigger external alarm
+    - index: 6
+      name: Manual defrost trigger
+    name: Digital input 3 configuration
+    acronym: I17
+    description: '-'
+    address: 60120
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 64
+  - id: PARAM_DIG_CONF_4
+    type: bitwise
+    fields:
+    - index: 0
+      name: Polarity Activated when closed
+    - index: 1
+      name: Turn evaporator fan OFF
+    - index: 2
+      name: Turn compressor OFF
+    - index: 3
+      name: Turn lights OFF
+    - index: 4
+      name: Trigger temporized door alarm
+    - index: 5
+      name: Trigger external alarm
+    - index: 6
+      name: Manual defrost trigger
+    name: Digital input 4 configuration
+    acronym: I18
+    description: '-'
+    address: 60121
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 128
+  - id: PARAM_DIG_CONF_5
+    type: bitwise
+    fields:
+    - index: 0
+      name: Polarity Activated when closed
+    - index: 1
+      name: Turn evaporator fan OFF
+    - index: 2
+      name: Turn compressor OFF
+    - index: 3
+      name: Turn lights OFF
+    - index: 4
+      name: Trigger temporized door alarm
+    - index: 5
+      name: Trigger external alarm
+    - index: 6
+      name: Manual defrost trigger
+    name: Digital input 5 configuration
+    acronym: I19
+    description: '-'
+    address: 60122
+    min_value: 0.0
+    max_value: 127.0
+    default_value: 18.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 256
+  - id: PARAM_DIG_DELAY
+    type: integer
+    unit: sec
+    name: Digital input delay
+    acronym: I20
+    description: Time delay between digital input activation and execution of action
+    address: 60123
+    min_value: 1.0
+    max_value: 999.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_RELAY_MODE_1
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Compressor
+    - index: 2
+      name: Evaporator Fan
+    - index: 3
+      name: Condenser Fan
+    - index: 4
+      name: Defrost
+    - index: 5
+      name: Defrost auxiliar
+    - index: 6
+      name: Door Heater
+    - index: 7
+      name: Lights
+    name: Relay 1 mode
+    acronym: rE0
+    description: Select the load connected to each relay
+    address: 60124
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 1
+  - id: PARAM_RELAY_MODE_2
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Reserved
+    - index: 2
+      name: Evaporator Fan
+    - index: 3
+      name: Condenser Fan
+    - index: 4
+      name: Defrost
+    - index: 5
+      name: Defrost auxiliar
+    - index: 6
+      name: Door Heater
+    - index: 7
+      name: Lights
+    name: Relay 2 mode
+    acronym: rE1
+    description: Select the load connected to each relay
+    address: 60125
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 2
+  - id: PARAM_RELAY_MODE_3
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Reserved
+    - index: 2
+      name: Evaporator Fan
+    - index: 3
+      name: Condenser Fan
+    - index: 4
+      name: Defrost
+    - index: 5
+      name: Defrost auxiliar
+    - index: 6
+      name: Door Heater
+    - index: 7
+      name: Lights
+    name: Relay 3 mode
+    acronym: rE2
+    description: Select the load connected to each relay
+    address: 60126
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 4.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4
+  - id: PARAM_RELAY_MODE_4
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Reserved
+    - index: 2
+      name: Evaporator Fan
+    - index: 3
+      name: Condenser Fan
+    - index: 4
+      name: Defrost
+    - index: 5
+      name: Defrost auxiliar
+    - index: 6
+      name: Door Heater
+    - index: 7
+      name: Lights
+    name: Relay 4 mode
+    acronym: rE3
+    description: Select the load connected to each relay
+    address: 60127
+    min_value: 0.0
+    max_value: 7.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 8
+  - id: PARAM_IHM_TEMP_UNIT
+    type: enum
+    fields:
+    - index: 0
+      name: ºC
+    - index: 1
+      name: ºF
+    name: Temperature unit
+    acronym: dP0
+    description: '-'
+    address: 60128
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_IHM_REDUCED_BRIGHT_ENABLE
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Standby brightness enable
+    acronym: dP1
+    description: '-'
+    address: 60129
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_IHM_REDUCED_BRIGHT_MIN
+    type: unsigned integer
+    name: Standby brightness
+    acronym: dP2
+    description: '-'
+    address: 60130
+    min_value: 1.0
+    max_value: 9.0
+    default_value: 2.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_IHM_REDUCED_BRIGHT_MAX
+    type: unsigned integer
+    name: Active use brightness
+    acronym: dP3
+    description: '-'
+    address: 60131
+    min_value: 1.0
+    max_value: 10.0
+    default_value: 10.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_IHM_TEMP_OFFSET
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Temperature to show offset
+    acronym: dP4
+    description: '-'
+    address: 60132
+    min_value: -10.0
+    max_value: 10.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+    is_delta: true
+  - id: PARAM_IHM_TEMP_INPUT
+    type: enum
+    fields:
+    - index: 0
+      name: Cabinet
+    - index: 1
+      name: Display
+    name: Probe for temperature display
+    acronym: dP5
+    description: '-'
+    address: 60138
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_IHM_TIME_TO_KEY_LOCK
+    type: integer
+    unit: sec
+    name: Time for keyboard lock
+    acronym: dP6
+    description: '-'
+    address: 60139
+    min_value: 10.0
+    max_value: 999.0
+    default_value: 60.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 32768
+  - id: PARAM_COMM_MB_BAUDRATE
+    type: enum
+    fields:
+    - index: 0
+      name: '600'
+    - index: 1
+      name: '1200'
+    - index: 2
+      name: '2400'
+    - index: 3
+      name: '4800'
+    - index: 4
+      name: '9600'
+    - index: 5
+      name: '14400'
+    - index: 6
+      name: '19200'
+    - index: 7
+      name: '28800'
+    - index: 8
+      name: '38400'
+    - index: 9
+      name: '57600'
+    name: Baudrate
+    acronym: Mb0
+    description: '-'
+    address: 60133
+    min_value: 0.0
+    max_value: 9.0
+    default_value: 4.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COMM_MB_SLAVE_ADDR
+    type: unsigned integer
+    name: Slave address
+    acronym: Mb1
+    description: '-'
+    address: 60134
+    min_value: 1.0
+    max_value: 127.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_COMM_MB_STOP_BIT
+    type: unsigned integer
+    name: Stop bits
+    acronym: Mb2
+    description: '-'
+    address: 60135
+    min_value: 1.0
+    max_value: 2.0
+    default_value: 1.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DATALOG_PERIOD
+    type: integer
+    unit: min
+    name: Log interval
+    acronym: dI0
+    description: '-'
+    address: 60136
+    min_value: 10.0
+    max_value: 999.0
+    default_value: 360.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DATALOG_ENABLE
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Enabling of datalogger
+    acronym: dI1
+    description: '-'
+    address: 60137
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_DEV_BUS_MODE
+    type: enum
+    fields:
+    - index: 0
+      name: Basic
+    - index: 1
+      name: Device Bus
+    name: Device bus configuration
+    acronym: b01
+    description: '-'
+    address: 60145
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 1
+    write_access_level: 1
+    hw_sw_set_mask: 4096
+  - id: PARAM_SIMUL_MODE_PSWD
+    type: unsigned integer
+    name: Simulation mode password
+    acronym: SIM_01
+    description: '-'
+    address: 60146
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_CONF
+    type: unsigned integer
+    name: Simulation mode configuration
+    acronym: SIM_02
+    description: '-'
+    address: 60147
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_ADC_VALUE_1
+    type: unsigned integer
+    name: ADC value 1
+    acronym: SIM_03
+    description: '-'
+    address: 60148
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 16
+  - id: PARAM_SIMUL_MODE_ADC_VALUE_2
+    type: unsigned integer
+    name: ADC value 2
+    acronym: SIM_04
+    description: '-'
+    address: 60149
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 32
+  - id: PARAM_SIMUL_MODE_ADC_VALUE_3
+    type: unsigned integer
+    name: ADC value 3
+    acronym: SIM_05
+    description: '-'
+    address: 60150
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 64
+  - id: PARAM_SIMUL_MODE_ADC_VALUE_4
+    type: unsigned integer
+    name: ADC value 4
+    acronym: SIM_06
+    description: '-'
+    address: 60151
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 128
+  - id: PARAM_SIMUL_MODE_ADC_VALUE_5
+    type: unsigned integer
+    name: ADC value 5
+    acronym: SIM_07
+    description: '-'
+    address: 60152
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 256
+  - id: PARAM_SIMUL_MODE_ADC_VALUE_6
+    type: unsigned integer
+    name: ADC value 6
+    acronym: SIM_08
+    description: '-'
+    address: 60153
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_ADC_VALUE_7
+    type: unsigned integer
+    name: ADC value 7
+    acronym: SIM_09
+    description: '-'
+    address: 60154
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_CABINET
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Cabinet'
+    acronym: SIM_10
+    description: '-'
+    address: 60155
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_EVAP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Evaporator'
+    acronym: SIM_11
+    description: '-'
+    address: 60156
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_COND
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Condenser'
+    acronym: SIM_12
+    description: '-'
+    address: 60157
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_AMB
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Ambient'
+    acronym: SIM_13
+    description: '-'
+    address: 60158
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_DOOR
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Door'
+    acronym: SIM_14
+    description: '-'
+    address: 60159
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_AUX
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Auxiliar'
+    acronym: SIM_15
+    description: '-'
+    address: 60160
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_EVAP_2
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Evaporator 2'
+    acronym: SIM_16
+    description: '-'
+    address: 60161
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_DISPLAY
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Display'
+    acronym: SIM_17
+    description: '-'
+    address: 60162
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_SIMUL_MODE_TEMP_PRODUCT
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: 'Simulated temperature: Product'
+    acronym: SIM_18
+    description: '-'
+    address: 60163
+    min_value: -99.9
+    max_value: 99.9
+    default_value: 0.0
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_OVERRIDE_ENABLE
+    type: enum
+    fields:
+    - index: 0
+      name: Disable
+    - index: 1
+      name: Enable
+    name: Override enable
+    acronym: O1
+    description: '-'
+    address: 60195
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_OVERRIDE_RELAY_1
+    type: enum
+    fields:
+    - index: 0
+      name: 'Off'
+    - index: 1
+      name: 'On'
+    name: Override - Relay 1
+    acronym: O2
+    description: '-'
+    address: 60196
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 1
+  - id: PARAM_OVERRIDE_RELAY_2
+    type: enum
+    fields:
+    - index: 0
+      name: 'Off'
+    - index: 1
+      name: 'On'
+    name: Override - Relay 2
+    acronym: O3
+    description: '-'
+    address: 60197
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 2
+  - id: PARAM_OVERRIDE_RELAY_3
+    type: enum
+    fields:
+    - index: 0
+      name: 'Off'
+    - index: 1
+      name: 'On'
+    name: Override - Relay 3
+    acronym: O4
+    description: '-'
+    address: 60198
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 4
+  - id: PARAM_OVERRIDE_RELAY_4
+    type: enum
+    fields:
+    - index: 0
+      name: 'Off'
+    - index: 1
+      name: 'On'
+    name: Override - Relay 4
+    acronym: O5
+    description: '-'
+    address: 60199
+    min_value: 0.0
+    max_value: 1.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 8
+  - id: PARAM_OVERRIDE_COMP_SPEED
+    type: integer
+    unit: RPM
+    name: Override - Compressor Speed
+    acronym: O6
+    description: '-'
+    address: 60200
+    min_value: 0.0
+    max_value: 7000.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 3932160
+  - id: PARAM_OVERRIDE_EVAP_SPEED
+    type: integer
+    unit: RPM
+    name: Override - Evap Fan Speed
+    acronym: O7
+    description: '-'
+    address: 60201
+    min_value: 0.0
+    max_value: 3000.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 33554432
+  - id: PARAM_OVERRIDE_COND_SPEED
+    type: integer
+    unit: RPM
+    name: Override - Cond Fan Speed
+    acronym: O8
+    description: '-'
+    address: 60202
+    min_value: 0.0
+    max_value: 3000.0
+    default_value: 0.0
+    read_access_level: 2
+    write_access_level: 2
+    hw_sw_set_mask: 33554432
+  - id: PARAM_PSWD_LEVEL3
+    type: unsigned integer
+    name: Password - Level 3
+    acronym: INTERNAL_01
+    description: '-'
+    address: 60168
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_ALWAYS_ZERO
+    type: unsigned integer
+    name: Zero
+    acronym: INTERNAL_02
+    description: '-'
+    address: 60190
+    min_value: 0.0
+    max_value: 0.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_HW_SW_SET_HI
+    type: unsigned integer
+    name: HW / SW set High
+    acronym: INTERNAL_03
+    description: '-'
+    address: 60191
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 65535.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_HW_SW_SET_LO
+    type: unsigned integer
+    name: HW / SW set Low
+    acronym: INTERNAL_04
+    description: '-'
+    address: 60192
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 65535.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_RESET_COUNTER
+    type: unsigned integer
+    name: Reset Counter
+    acronym: INTERNAL_05
+    description: '-'
+    address: 60203
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD00
+    type: unsigned integer
+    name: UUID Word 00
+    acronym: INTERNAL_06
+    description: '-'
+    address: 60204
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD01
+    type: unsigned integer
+    name: UUID Word 01
+    acronym: INTERNAL_07
+    description: '-'
+    address: 60205
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD02
+    type: unsigned integer
+    name: UUID Word 02
+    acronym: INTERNAL_08
+    description: '-'
+    address: 60206
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD03
+    type: unsigned integer
+    name: UUID Word 03
+    acronym: INTERNAL_09
+    description: '-'
+    address: 60207
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD04
+    type: unsigned integer
+    name: UUID Word 04
+    acronym: INTERNAL_10
+    description: '-'
+    address: 60208
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD05
+    type: unsigned integer
+    name: UUID Word 05
+    acronym: INTERNAL_11
+    description: '-'
+    address: 60209
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD06
+    type: unsigned integer
+    name: UUID Word 06
+    acronym: INTERNAL_12
+    description: '-'
+    address: 60210
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD07
+    type: unsigned integer
+    name: UUID Word 07
+    acronym: INTERNAL_13
+    description: '-'
+    address: 60211
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD08
+    type: unsigned integer
+    name: UUID Word 08
+    acronym: INTERNAL_14
+    description: '-'
+    address: 60212
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD09
+    type: unsigned integer
+    name: UUID Word 09
+    acronym: INTERNAL_15
+    description: '-'
+    address: 60213
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_UUID_WORD10
+    type: unsigned integer
+    name: UUID Word 10
+    acronym: INTERNAL_16
+    description: '-'
+    address: 60214
+    min_value: 0.0
+    max_value: 65535.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_BUS_VOLTAGE_OFFSET
+    type: integer
+    name: Bus voltage offset
+    acronym: INTERNAL_17
+    description: '-'
+    address: 60224
+    min_value: -10000.0
+    max_value: 10000.0
+    default_value: 0.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  - id: PARAM_BUS_VOLTAGE_GAIN
+    type: unsigned integer
+    name: Bus voltage gain
+    acronym: INTERNAL_18
+    description: '-'
+    address: 60225
+    min_value: 0.0
+    max_value: 2000.0
+    default_value: 1000.0
+    is_read_only: true
+    read_access_level: 3
+    write_access_level: 3
+    hw_sw_set_mask: 4294967295
+  status:
+  - id: STATUS_ID_DEVICE_ID
+    type: unsigned integer
+    name: Device ID
+    description: '-'
+    address: 0
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SW_VERSION
+    type: unsigned integer
+    name: SW version
+    description: '-'
+    address: 1
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_BUILD
+    type: unsigned integer
+    name: Build
+    description: '-'
+    address: 2
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ACCESS_INTERFACE
+    type: unsigned integer
+    name: Access Interface
+    description: '-'
+    address: 3
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ACCESS_LEVEL
+    type: unsigned integer
+    name: Access Level
+    description: '-'
+    address: 4
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_CURRENT_ACCESS_LEVEL
+    type: unsigned integer
+    name: Current Access Level
+    description: '-'
+    address: 5
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ADC_IN_1
+    type: unsigned integer
+    name: ADC_IN_1
+    description: '-'
+    address: 10
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ADC_IN_2
+    type: unsigned integer
+    name: ADC_IN_2
+    description: '-'
+    address: 11
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ADC_IN_3
+    type: unsigned integer
+    name: ADC_IN_3
+    description: '-'
+    address: 12
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ADC_IN_4
+    type: unsigned integer
+    name: ADC_IN_4
+    description: '-'
+    address: 13
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ADC_IN_5
+    type: unsigned integer
+    name: ADC_IN_5
+    description: '-'
+    address: 14
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ADC_IN_6
+    type: unsigned integer
+    name: ADC_IN_6
+    description: '-'
+    address: 15
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_KEYBOARD_BUTTONS
+    type: unsigned integer
+    name: Keyboard state
+    description: '-'
+    address: 18
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_DIG_IN_STATE
+    type: bitwise
+    fields:
+    - index: 0
+      name: DI_1_state
+    - index: 1
+      name: DI_2_state
+    - index: 2
+      name: DI_3_state
+    - index: 3
+      name: DI_4_state
+    - index: 4
+      name: DI_5_state
+    name: Digital inputs states
+    description: '-'
+    address: 19
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_RELAY_STATE
+    type: bitwise
+    fields:
+    - index: 0
+      name: Relay_1_state
+    - index: 1
+      name: Relay_2_state
+    - index: 2
+      name: Relay_3_state
+    - index: 3
+      name: Relay_4_state
+    name: Relay states
+    description: '-'
+    address: 20
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_FREQ_OUT
+    type: unsigned integer
+    name: Frequency output
+    description: '-'
+    address: 21
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_BUS_VOLTAGE
+    type: integer
+    unit: V
+    name: Bus voltage
+    description: '-'
+    address: 22
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_TEMP_CABINET
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Cabinet temperature
+    description: '-'
+    address: 100
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==2)||(PARAM_IN_MODE_2.value==2)||(PARAM_IN_MODE_3.value==2)||(PARAM_IN_MODE_4.value==2)||(PARAM_IN_MODE_5.value==2)}
+  - id: STATUS_ID_TEMP_EVAP
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Evaporator temperature
+    description: '-'
+    address: 101
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==3)||(PARAM_IN_MODE_2.value==3)||(PARAM_IN_MODE_3.value==3)||(PARAM_IN_MODE_4.value==3)||(PARAM_IN_MODE_5.value==3)}
+  - id: STATUS_ID_TEMP_COND
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Condenser temperature
+    description: '-'
+    address: 102
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==4)||(PARAM_IN_MODE_2.value==4)||(PARAM_IN_MODE_3.value==4)||(PARAM_IN_MODE_4.value==4)||(PARAM_IN_MODE_5.value==4)}
+  - id: STATUS_ID_TEMP_AMB
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Ambient temperature
+    description: '-'
+    address: 103
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==5)||(PARAM_IN_MODE_2.value==5)||(PARAM_IN_MODE_3.value==5)||(PARAM_IN_MODE_4.value==5)||(PARAM_IN_MODE_5.value==5)}
+  - id: STATUS_ID_TEMP_DOOR
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Door temperature
+    description: '-'
+    address: 104
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==6)||(PARAM_IN_MODE_2.value==6)||(PARAM_IN_MODE_3.value==6)||(PARAM_IN_MODE_4.value==6)||(PARAM_IN_MODE_5.value==6)}
+  - id: STATUS_ID_TEMP_AUX
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Auxiliar temperature
+    description: '-'
+    address: 105
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==7)||(PARAM_IN_MODE_2.value==7)||(PARAM_IN_MODE_3.value==7)||(PARAM_IN_MODE_4.value==7)||(PARAM_IN_MODE_5.value==7)}
+  - id: STATUS_ID_TEMP_EVAP_2
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Evaporator 2 temperature
+    description: '-'
+    address: 106
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==8)||(PARAM_IN_MODE_2.value==8)||(PARAM_IN_MODE_3.value==8)||(PARAM_IN_MODE_4.value==8)||(PARAM_IN_MODE_5.value==8)}
+  - id: STATUS_ID_TEMP_DISPLAY
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Dedicated display temperature
+    description: '-'
+    address: 107
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==9)||(PARAM_IN_MODE_2.value==9)||(PARAM_IN_MODE_3.value==9)||(PARAM_IN_MODE_4.value==9)||(PARAM_IN_MODE_5.value==9)}
+  - id: STATUS_ID_TEMP_PRODUCT
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 100
+    name: Product temperature
+    description: '-'
+    address: 108
+    hw_sw_set_mask: 4294967295
+    is_visible: ${(PARAM_IN_MODE_1.value==10)||(PARAM_IN_MODE_2.value==10)||(PARAM_IN_MODE_3.value==10)||(PARAM_IN_MODE_4.value==10)||(PARAM_IN_MODE_5.value==10)}
+  - id: STATUS_ID_ALARM_HIGH_INT_TEMP
+    type: boolean
+    name: High internal temperature alarm state
+    description: '-'
+    address: 200
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_LOW_INT_TEMP
+    type: boolean
+    name: Low internal temperature alarm state
+    description: '-'
+    address: 201
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_HIGH_COND_TEMP
+    type: boolean
+    name: High condenser temperature alarm state
+    description: '-'
+    address: 202
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_LOW_CAPACITY
+    type: boolean
+    name: Low capacity alarm state
+    description: '-'
+    address: 203
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_EXT_IN
+    type: boolean
+    name: External input alarm state
+    description: '-'
+    address: 204
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_DOOR_OPEN
+    type: boolean
+    name: Door open alarm state
+    description: '-'
+    address: 205
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_PROBE
+    type: boolean
+    name: Faulty probe alarm state
+    description: '-'
+    address: 206
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_INV_COMM
+    type: boolean
+    name: Inverter communication alarm state
+    description: '-'
+    address: 207
+    hw_sw_set_mask: 3932160
+    is_visible: true
+  - id: STATUS_ID_ALARM_DEFROST
+    type: boolean
+    name: Defrost termination error alarm state
+    description: '-'
+    address: 208
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_RTC
+    type: boolean
+    name: Clock not configured alarm state
+    description: '-'
+    address: 209
+    hw_sw_set_mask: 16384
+    is_visible: true
+  - id: STATUS_ID_ALARM_HIGH_AUX_TEMP
+    type: boolean
+    name: High auxiliar temperature alarm state
+    description: '-'
+    address: 210
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_LOW_AUX_TEMP
+    type: boolean
+    name: Low auxiliar temperature alarm state
+    description: '-'
+    address: 211
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_HIGH_VOLTAGE
+    type: boolean
+    name: High voltage alarm state
+    description: '-'
+    address: 212
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ALARM_LOW_VOLTAGE
+    type: boolean
+    name: Low voltage alarm state
+    description: '-'
+    address: 213
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_THERM_STATE
+    type: enum
+    fields:
+    - index: 0
+      name: Idle
+    - index: 1
+      name: Cooling
+    - index: 2
+      name: Prepare
+    - index: 3
+      name: Defrost
+    - index: 4
+      name: Post-Defrost
+    - index: 5
+      name: Pulldown
+    name: Thermostat state
+    description: '-'
+    address: 300
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_DEFROST_STATE
+    type: enum
+    fields:
+    - index: 0
+      name: Idle
+    - index: 1
+      name: Wait end of cooling
+    - index: 2
+      name: Forcing defrost
+    - index: 3
+      name: Pre-Defrost
+    - index: 4
+      name: Defrost
+    - index: 5
+      name: Dripping
+    name: Defrost state
+    description: '-'
+    address: 301
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_FVT_STATUS
+    type: unsigned integer
+    name: FVT status
+    description: '-'
+    address: 302
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_CONTROLLER_STATE
+    type: enum
+    fields:
+    - index: 0
+      name: 'OFF'
+    - index: 1
+      name: Power ON
+    - index: 2
+      name: 'ON'
+    - index: 3
+      name: Serial Powered
+    - index: 4
+      name: FVT
+    - index: 5
+      name: Override
+    name: Controller state
+    description: '-'
+    address: 303
+    hw_sw_set_mask: 4294967295
+    is_visible: true
+  - id: STATUS_ID_ADC_TIMEOUT_FAILS
+    type: unsigned integer
+    name: ADC failure 1
+    description: '-'
+    address: 400
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ADC_EOC_HIGH_FAILS
+    type: unsigned integer
+    name: ADC failure 2
+    description: '-'
+    address: 401
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ADC_ALL_READINGS_EQUAL
+    type: unsigned integer
+    name: ADC failure 3
+    description: '-'
+    address: 402
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_P_COMPONENT
+    type: unsigned integer
+    name: Proportional control component
+    description: '-'
+    address: 403
+    hw_sw_set_mask: 3670016
+    is_visible: false
+  - id: STATUS_ID_I_COMPONENT
+    type: unsigned integer
+    name: Integral control component
+    description: '-'
+    address: 404
+    hw_sw_set_mask: 2621440
+    is_visible: false
+  - id: STATUS_ID_D_COMPONENT
+    type: unsigned integer
+    name: Derivative control component
+    description: '-'
+    address: 405
+    hw_sw_set_mask: 2621440
+    is_visible: false
+  - id: STATUS_ID_PID_CTRL_ERROR
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: VCC control error
+    description: '-'
+    address: 406
+    hw_sw_set_mask: 2621440
+    is_visible: false
+  - id: STATUS_ID_ADP_DEF_THRESHOLD
+    type: integer
+    unit: UNIT_TEMPERATURE
+    multiplier: 10
+    name: Adaptive defrost threshold
+    description: '-'
+    address: 407
+    hw_sw_set_mask: 4194304
+    is_visible: false
+  - id: STATUS_ID_COMP_SPEED
+    type: integer
+    unit: RPM
+    name: Compressor speed
+    description: '-'
+    address: 500
+    hw_sw_set_mask: 3932160
+    is_visible: ${PARAM_COMP_CTRL_TYPE.value==1}
+  - id: STATUS_ID_COMP_SET_SPEED
+    type: integer
+    unit: RPM
+    name: Compressor set speed
+    description: '-'
+    address: 501
+    hw_sw_set_mask: 3932160
+    is_visible: ${(PARAM_COMP_CTRL_TYPE.value==1)&&${PARAM_DEV_BUS_MODE.value==0}}
+  - id: STATUS_ID_COMP_POWER
+    type: unsigned integer
+    name: Compressor power
+    description: '-'
+    address: 502
+    hw_sw_set_mask: 3932160
+    is_visible: ${(PARAM_COMP_CTRL_TYPE.value==1)&&${PARAM_DEV_BUS_MODE.value==0}}
+  - id: STATUS_ID_COMP_OP_STATUS
+    type: unsigned integer
+    name: Compressor operation status
+    description: '-'
+    address: 503
+    hw_sw_set_mask: 3932160
+    is_visible: ${(PARAM_COMP_CTRL_TYPE.value==1)&&${PARAM_DEV_BUS_MODE.value==0}}
+  - id: STATUS_ID_EVAP_FAN_SPEED
+    type: integer
+    unit: RPM
+    name: Evaporator fan speed
+    description: '-'
+    address: 600
+    hw_sw_set_mask: 33554432
+    is_visible: ${PARAM_EVAP_CTRL_TYPE.value==1}
+  - id: STATUS_ID_COND_FAN_SPEED
+    type: integer
+    unit: RPM
+    name: Condenser fan speed
+    description: '-'
+    address: 700
+    hw_sw_set_mask: 33554432
+    is_visible: ${PARAM_COND_CTRL_TYPE.value==1}
+  - id: STATUS_ID_HMI_ALARMS
+    type: unsigned integer
+    name: STATUS_ID_HMI_ALARMS
+    description: '-'
+    address: 60000
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_HMI_SYMBOLS
+    type: unsigned integer
+    name: STATUS_ID_HMI_SYMBOLS
+    description: '-'
+    address: 60001
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_HMI_SYMBOLS_BLINK
+    type: unsigned integer
+    name: STATUS_ID_HMI_SYMBOLS_BLINK
+    description: '-'
+    address: 60002
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_HMI_MESSAGE_0
+    type: unsigned integer
+    name: STATUS_ID_HMI_MESSAGE_0
+    description: '-'
+    address: 60010
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_HMI_MESSAGE_1
+    type: unsigned integer
+    name: STATUS_ID_HMI_MESSAGE_1
+    description: '-'
+    address: 60011
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_TASK_1MS_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_TASK_1MS_RUN_TIME
+    description: '-'
+    address: 60020
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_TASK_1MS_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_TASK_1MS_ISSUES
+    description: '-'
+    address: 60021
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_TASK_1MS_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_TASK_1MS_PERIOD
+    description: '-'
+    address: 60022
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_TASK_BACKGROUND_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_TASK_BACKGROUND_RUN_TIME
+    description: '-'
+    address: 60023
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_TASK_BACKGROUND_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_TASK_BACKGROUND_ISSUES
+    description: '-'
+    address: 60024
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_TASK_BACKGROUND_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_TASK_BACKGROUND_PERIOD
+    description: '-'
+    address: 60025
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ISR_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_ISR_RUN_TIME
+    description: '-'
+    address: 60026
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ISR_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_ISR_ISSUES
+    description: '-'
+    address: 60027
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_ISR_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_ISR_PERIOD
+    description: '-'
+    address: 60028
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT01_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT01_RUN_TIME
+    description: '-'
+    address: 60030
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT02_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT02_RUN_TIME
+    description: '-'
+    address: 60031
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT03_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT03_RUN_TIME
+    description: '-'
+    address: 60032
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT04_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT04_RUN_TIME
+    description: '-'
+    address: 60033
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT05_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT05_RUN_TIME
+    description: '-'
+    address: 60034
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT06_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT06_RUN_TIME
+    description: '-'
+    address: 60035
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT07_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT07_RUN_TIME
+    description: '-'
+    address: 60036
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT08_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT08_RUN_TIME
+    description: '-'
+    address: 60037
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT09_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT09_RUN_TIME
+    description: '-'
+    address: 60038
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT10_RUN_TIME
+    type: unsigned integer
+    name: STATUS_ID_SLOT10_RUN_TIME
+    description: '-'
+    address: 60039
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT01_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT01_ISSUES
+    description: '-'
+    address: 60040
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT02_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT02_ISSUES
+    description: '-'
+    address: 60041
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT03_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT03_ISSUES
+    description: '-'
+    address: 60042
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT04_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT04_ISSUES
+    description: '-'
+    address: 60043
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT05_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT05_ISSUES
+    description: '-'
+    address: 60044
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT06_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT06_ISSUES
+    description: '-'
+    address: 60045
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT07_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT07_ISSUES
+    description: '-'
+    address: 60046
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT08_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT08_ISSUES
+    description: '-'
+    address: 60047
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT09_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT09_ISSUES
+    description: '-'
+    address: 60048
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT10_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_SLOT10_ISSUES
+    description: '-'
+    address: 60049
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT01_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT01_PERIOD
+    description: '-'
+    address: 60050
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT02_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT02_PERIOD
+    description: '-'
+    address: 60051
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT03_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT03_PERIOD
+    description: '-'
+    address: 60052
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT04_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT04_PERIOD
+    description: '-'
+    address: 60053
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT05_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT05_PERIOD
+    description: '-'
+    address: 60054
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT06_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT06_PERIOD
+    description: '-'
+    address: 60055
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT07_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT07_PERIOD
+    description: '-'
+    address: 60056
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT08_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT08_PERIOD
+    description: '-'
+    address: 60057
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT09_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT09_PERIOD
+    description: '-'
+    address: 60058
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_SLOT10_PERIOD
+    type: unsigned integer
+    name: STATUS_ID_SLOT10_PERIOD
+    description: '-'
+    address: 60059
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_CPU_USAGE
+    type: unsigned integer
+    name: STATUS_ID_CPU_USAGE
+    description: '-'
+    address: 60060
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_CPU_ISSUES
+    type: unsigned integer
+    name: STATUS_ID_CPU_ISSUES
+    description: '-'
+    address: 60061
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_RESET_COUNTER
+    type: unsigned integer
+    name: STATUS_ID_RESET_COUNTER
+    description: '-'
+    address: 60062
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+  - id: STATUS_ID_APP_CHECKSUM
+    type: unsigned integer
+    name: APP checksum
+    description: '-'
+    address: 65535
+    hw_sw_set_mask: 4294967295
+    is_visible: false
+services:
+- id: SERVICE_CONFIG
+  config_groups:
+  - id: CFG_GROUP_PASSWORD
+    name: Password
+    acronym: PAS
+    parameters:
+    - id: PARAM_SESSION_OPEN
+    - id: PARAM_PSWD_LEVEL1
+    - id: PARAM_PSWD_LEVEL2
+    - id: PARAM_PSWD_LEVEL_CTRL_ENABLE
+    - id: PARAM_PSWD_LEVEL_RS485_ENABLE
+  - id: CFG_GROUP_THERMOSTAT
+    name: Thermostat
+    acronym: tHE
+    parameters:
+    - id: PARAM_TH_SETPOINT
+    - id: PARAM_TH_HYSTERESIS
+    - id: PARAM_TH_MIN_SETPOINT
+    - id: PARAM_TH_MAX_SETPOINT
+    - id: PARAM_TH_PULLDOWN_STARTUP_EN
+    - id: PARAM_TH_PULLDOWN_TEMP_TRIG
+    - id: PARAM_TH_PULLDOWN_SPEED
+    - id: PARAM_TH_RECOVERY_DELTA_TEMP
+    - id: PARAM_TH_PROBE_FAULT_ON_TIME
+    - id: PARAM_TH_PROBE_FAULT_OFF_TIME
+    - id: PARAM_TH_PROBE_FAULT_SPEED
+    - id: PARAM_TH_PULLDOWN_TIMEOUT
+  - id: CFG_GROUP_COMPRESSOR
+    name: Compressor
+    acronym: CoP
+    parameters:
+    - id: PARAM_COMP_CTRL_TYPE
+    - id: PARAM_COMP_MIN_OFF_TIME
+    - id: PARAM_COMP_MIN_ON_TIME
+    - id: PARAM_COMP_MIN_START_PERIOD
+  - id: CFG_GROUP_DEFROST
+    name: Defrost
+    acronym: dFr
+    parameters:
+    - id: PARAM_DEF_TYPE
+    - id: PARAM_DEF_TIMEOUT_VALUE
+    - id: PARAM_DEF_EVAP_TEMP_VALUE
+    - id: PARAM_DEF_MAX_EVAP_TEMP_VALUE
+    - id: PARAM_DEF_DRIPPING_PERIOD
+    - id: PARAM_DEF_TRIG
+    - id: PARAM_DEF_TRIG_PERIOD
+    - id: PARAM_DEF_TRIG_MAX_PERIOD
+    - id: PARAM_DEF_TRIG_PERIOD_PULLDOWN
+    - id: PARAM_DEF_TRIG_SCHED_TIME_1
+    - id: PARAM_DEF_TRIG_SCHED_TIME_2
+    - id: PARAM_DEF_TRIG_SCHED_TIME_3
+    - id: PARAM_DEF_TRIG_SCHED_TIME_4
+    - id: PARAM_DEF_ADP_DELTA_TRIG
+    - id: PARAM_DEF_ADP_FILTER_LEVEL
+    - id: PARAM_DEF_ADP_STAB_FILTER_PERIOD
+    - id: PARAM_DEF_ADP_TRIG_MIN_PERIOD
+    - id: PARAM_DEF_MAX_COMP_ON_PERIOD
+    - id: PARAM_DEF_TRIG_STARTUP
+    - id: PARAM_DEF_ABSOLUTE_TRIGGER
+    - id: PARAM_DEF_SPEED
+    - id: PARAM_DEF_POST_DEFROST_SPEED
+    - id: PARAM_DEF_POST_DEFROST_TIMEOUT
+    - id: PARAM_DEF_PRE_DEF_PERIOD
+    - id: PARAM_DEF_AUX_LOAD_CFG
+    - id: PARAM_DEF_IHM_TEMP
+    - id: PARAM_DEF_IHM_TEMP_DELTA
+    - id: PARAM_DEF_IHM_TIMEOUT_VALUE
+  - id: CFG_GROUP_FAN
+    name: Fan
+    acronym: FAn
+    parameters:
+    - id: PARAM_EVAP_MODE
+    - id: PARAM_EVAP_DEF_STATE
+    - id: PARAM_EVAP_DELAY_POST_DEF
+    - id: PARAM_EVAP_ON_TEMP
+    - id: PARAM_EVAP_OFF_DELTA_TEMP
+    - id: PARAM_EVAP_PULSED_ON_TIME
+    - id: PARAM_EVAP_PULSED_OFF_TIME
+    - id: PARAM_EVAP_CTRL_TYPE
+    - id: PARAM_EVAP_FAN_VAR_CTRL_MODE
+    - id: PARAM_EVAP_FAN_VAR_RATE
+    - id: PARAM_EVAP_FAN_VAR_STANDBY_SPD
+    - id: PARAM_EVAP_FAN_VAR_CYCLE_SPD
+    - id: PARAM_EVAP_FAN_VAR_RECOVERY_SPD
+    - id: PARAM_EVAP_FAN_VAR_DEFROST_SPD
+    - id: PARAM_EVAP_FAN_VAR_PULLDOWN_SPD
+    - id: PARAM_EVAP_FAN_VAR_RECOVERY_DELTA_TEMP
+    - id: PARAM_EVAP_FAN_VAR_MIN_DELTA_TEMP_CTRL
+    - id: PARAM_EVAP_FAN_VAR_MAX_TEMP_CTRL
+    - id: PARAM_EVAP_FAN_VAR_MIN_COMP_CTRL
+    - id: PARAM_EVAP_FAN_VAR_MAX_COMP_CTRL
+    - id: PARAM_EVAP_FAN_DOOR_REV_TIME
+    - id: PARAM_EVAP_FAN_DOOR_STANDBY_TIME
+    - id: PARAM_COND_MODE
+    - id: PARAM_COND_COMP_ON_DELAY
+    - id: PARAM_COND_COMP_OFF_DELAY
+    - id: PARAM_COND_DEF_STATE
+    - id: PARAM_COND_ON_TEMP
+    - id: PARAM_COND_OFF_TEMP
+    - id: PARAM_COND_CTRL_TYPE
+    - id: PARAM_COND_FAN_VAR_CTRL_MODE
+    - id: PARAM_COND_FAN_VAR_RATE
+    - id: PARAM_COND_FAN_VAR_STANDBY_SPD
+    - id: PARAM_COND_FAN_VAR_CYCLE_SPD
+    - id: PARAM_COND_FAN_VAR_RECOVERY_SPD
+    - id: PARAM_COND_FAN_VAR_DEFROST_SPD
+    - id: PARAM_COND_FAN_VAR_PULLDOWN_SPD
+    - id: PARAM_COND_FAN_VAR_RECOVERY_COMP_SPD
+    - id: PARAM_COND_FAN_VAR_MIN_TEMP_CTRL
+    - id: PARAM_COND_FAN_VAR_MAX_TEMP_CTRL
+    - id: PARAM_COND_FAN_VAR_MIN_COMP_CTRL
+    - id: PARAM_COND_FAN_VAR_MAX_COMP_CTRL
+  - id: CFG_GROUP_DOOR_HEATER
+    name: Door Heater
+    acronym: dor
+    parameters:
+    - id: PARAM_DOOR_HEAT_MODE
+    - id: PARAM_DOOR_HEAT_DELTA_TO_AMB
+    - id: PARAM_DOOR_HEAT_HYST
+    - id: PARAM_DOOR_HEAT_DUTY_CYCLE
+    - id: PARAM_DOOR_HEAT_TEMP_CTRL_EN
+  - id: CFG_GROUP_LIGHT
+    name: Light
+    acronym: Lit
+    parameters:
+    - id: PARAM_LIGHTS_TEMP_CTRL_EN
+  - id: CFG_GROUP_VCC
+    name: VCC Control
+    acronym: vCC
+    parameters:
+    - id: PARAM_VCC_SPEED_MAX
+    - id: PARAM_VCC_SPEED_MIN
+    - id: PARAM_VCC_RPM_HZ
+    - id: PARAM_VCC_CTRL_MODE
+    - id: PARAM_VCC_KP
+    - id: PARAM_VCC_KI
+    - id: PARAM_VCC_KD
+    - id: PARAM_VCC_CYCLE_END_STAB_TIME
+    - id: PARAM_VCC_TTO
+    - id: PARAM_VCC_TTO_TIMEOUT
+    - id: PARAM_VCC_MSS
+    - id: PARAM_VCC_DISTURB_TIME
+    - id: PARAM_VCC_SHORT_CYCLE_DAMPENING
+    - id: PARAM_VCC_TRANSITION_TIME
+    - id: PARAM_VCC_CUT_OFF_DELTA
+    - id: PARAM_VCC_FIXED_SPEED_SPEED
+  - id: CFG_GROUP_ALARMS
+    name: Alarms
+    acronym: ALm
+    parameters:
+    - id: PARAM_ALARM_HIGH_INT_TEMP_CFG
+    - id: PARAM_ALARM_HIGH_INT_TEMP_VALUE
+    - id: PARAM_ALARM_HIGH_INT_TEMP_DELAY
+    - id: PARAM_ALARM_HIGH_INT_TEMP_STARTUP_DELAY
+    - id: PARAM_ALARM_HIGH_INT_TEMP_DEFROST_DELAY
+    - id: PARAM_ALARM_LOW_INT_TEMP_CFG
+    - id: PARAM_ALARM_LOW_INT_TEMP_VALUE
+    - id: PARAM_ALARM_LOW_INT_TEMP_DELAY
+    - id: PARAM_ALARM_HIGH_COND_TEMP_CFG
+    - id: PARAM_ALARM_HIGH_COND_TEMP_VALUE
+    - id: PARAM_ALARM_HIGH_COND_TEMP_DELAY
+    - id: PARAM_ALARM_LOW_CAPACITY_CFG
+    - id: PARAM_ALARM_LOW_CAPACITY_PERIOD
+    - id: PARAM_ALARM_EXT_IN_CFG
+    - id: PARAM_ALARM_EXT_IN_DELAY
+    - id: PARAM_ALARM_DOOR_OPEN_CFG
+    - id: PARAM_ALARM_DOOR_OPEN_DELAY
+    - id: PARAM_ALARM_PROBE_CFG
+    - id: PARAM_ALARM_INV_COMM_CFG
+    - id: PARAM_ALARM_DEFROST_CFG
+    - id: PARAM_ALARM_RTC_CFG
+    - id: PARAM_ALARM_HIGH_AUX_TEMP_CFG
+    - id: PARAM_ALARM_HIGH_AUX_TEMP_VALUE
+    - id: PARAM_ALARM_HIGH_AUX_TEMP_DELAY
+    - id: PARAM_ALARM_LOW_AUX_TEMP_CFG
+    - id: PARAM_ALARM_LOW_AUX_TEMP_VALUE
+    - id: PARAM_ALARM_LOW_AUX_TEMP_DELAY
+    - id: PARAM_ALARM_BUS_VOLTAGE_CFG
+    - id: PARAM_ALARM_BUS_VOLTAGE_HIGH
+    - id: PARAM_ALARM_BUS_VOLTAGE_HIGH_DELTA
+    - id: PARAM_ALARM_BUS_VOLTAGE_LOW
+    - id: PARAM_ALARM_BUS_VOLTAGE_LOW_DELTA
+  - id: CFG_GROUP_INPUTS
+    name: Inputs
+    acronym: InP
+    parameters:
+    - id: PARAM_IN_MODE_1
+    - id: PARAM_IN_MODE_2
+    - id: PARAM_IN_MODE_3
+    - id: PARAM_IN_MODE_4
+    - id: PARAM_IN_MODE_5
+    - id: PARAM_PROBE_MODEL
+    - id: PARAM_PROBE_OFFSET_1
+    - id: PARAM_PROBE_OFFSET_2
+    - id: PARAM_PROBE_OFFSET_3
+    - id: PARAM_PROBE_OFFSET_4
+    - id: PARAM_PROBE_OFFSET_5
+    - id: PARAM_CUSTOM_NTC_T_REF
+    - id: PARAM_CUSTOM_NTC_R_REF
+    - id: PARAM_CUSTOM_NTC_BETA_A
+    - id: PARAM_CUSTOM_NTC_BETA_B
+    - id: PARAM_DIG_CONF_1
+    - id: PARAM_DIG_CONF_2
+    - id: PARAM_DIG_CONF_3
+    - id: PARAM_DIG_CONF_4
+    - id: PARAM_DIG_CONF_5
+    - id: PARAM_DIG_DELAY
+  - id: CFG_GROUP_RELAYS
+    name: Relays
+    acronym: rEL
+    parameters:
+    - id: PARAM_RELAY_MODE_1
+    - id: PARAM_RELAY_MODE_2
+    - id: PARAM_RELAY_MODE_3
+    - id: PARAM_RELAY_MODE_4
+  - id: CFG_GROUP_DISPLAY
+    name: Display
+    acronym: dSP
+    parameters:
+    - id: PARAM_IHM_TEMP_UNIT
+    - id: PARAM_IHM_REDUCED_BRIGHT_ENABLE
+    - id: PARAM_IHM_REDUCED_BRIGHT_MIN
+    - id: PARAM_IHM_REDUCED_BRIGHT_MAX
+    - id: PARAM_IHM_TEMP_OFFSET
+    - id: PARAM_IHM_TEMP_INPUT
+    - id: PARAM_IHM_TIME_TO_KEY_LOCK
+  - id: CFG_GROUP_MODBUS
+    name: Modbus
+    acronym: Mb
+    parameters:
+    - id: PARAM_COMM_MB_BAUDRATE
+    - id: PARAM_COMM_MB_SLAVE_ADDR
+    - id: PARAM_COMM_MB_STOP_BIT
+  - id: CFG_GROUP_DATALOGGER
+    name: Datalogger
+    acronym: dtL
+    parameters:
+    - id: PARAM_DATALOG_PERIOD
+    - id: PARAM_DATALOG_ENABLE
+  - id: CFG_GROUP_DEVICE_BUS
+    name: Device Bus
+    acronym: bUS
+    parameters:
+    - id: PARAM_DEV_BUS_MODE
+  - id: CFG_GROUP_OVERRIDE
+    name: Override
+    acronym: OvE
+    parameters:
+    - id: PARAM_OVERRIDE_ENABLE
+    - id: PARAM_OVERRIDE_RELAY_1
+    - id: PARAM_OVERRIDE_RELAY_2
+    - id: PARAM_OVERRIDE_RELAY_3
+    - id: PARAM_OVERRIDE_RELAY_4
+    - id: PARAM_OVERRIDE_COMP_SPEED
+    - id: PARAM_OVERRIDE_EVAP_SPEED
+    - id: PARAM_OVERRIDE_COND_SPEED
+- id: SERVICE_DATA_ACQUISITION
+  table_data:
+  - id: STATUS_ID_TEMP_CABINET
+  - id: STATUS_ID_TEMP_EVAP
+  - id: STATUS_ID_TEMP_COND
+  - id: STATUS_ID_TEMP_AMB
+  - id: STATUS_ID_TEMP_DOOR
+  - id: STATUS_ID_TEMP_AUX
+  - id: STATUS_ID_TEMP_EVAP_2
+  - id: STATUS_ID_TEMP_DISPLAY
+  - id: STATUS_ID_TEMP_PRODUCT
+  - id: STATUS_ID_THERM_STATE
+  - id: STATUS_ID_COMP_SPEED
+  - id: STATUS_ID_COMP_SET_SPEED
+  - id: STATUS_ID_COMP_POWER
+  - id: STATUS_ID_COMP_OP_STATUS
+  - id: STATUS_ID_EVAP_FAN_SPEED
+  - id: STATUS_ID_COND_FAN_SPEED
+  graph_data:
+  - id: STATUS_ID_DIG_IN_STATE
+  - id: STATUS_ID_RELAY_STATE
+  - id: STATUS_ID_TEMP_CABINET
+  - id: STATUS_ID_TEMP_EVAP
+  - id: STATUS_ID_TEMP_COND
+  - id: STATUS_ID_TEMP_AMB
+  - id: STATUS_ID_TEMP_DOOR
+  - id: STATUS_ID_TEMP_AUX
+  - id: STATUS_ID_TEMP_EVAP_2
+  - id: STATUS_ID_TEMP_DISPLAY
+  - id: STATUS_ID_TEMP_PRODUCT
+  - id: STATUS_ID_THERM_STATE
+  - id: STATUS_ID_COMP_SPEED
+  - id: STATUS_ID_COMP_SET_SPEED
+  - id: STATUS_ID_COMP_POWER
+  - id: STATUS_ID_COMP_OP_STATUS
+  - id: STATUS_ID_EVAP_FAN_SPEED
+  - id: STATUS_ID_COND_FAN_SPEED
+  - id: PARAM_TH_SETPOINT
+  storage_data:
+  - id: STATUS_ID_DIG_IN_STATE
+  - id: STATUS_ID_RELAY_STATE
+  - id: STATUS_ID_BUS_VOLTAGE
+  - id: STATUS_ID_TEMP_CABINET
+  - id: STATUS_ID_TEMP_EVAP
+  - id: STATUS_ID_TEMP_COND
+  - id: STATUS_ID_TEMP_AMB
+  - id: STATUS_ID_TEMP_DOOR
+  - id: STATUS_ID_TEMP_AUX
+  - id: STATUS_ID_TEMP_EVAP_2
+  - id: STATUS_ID_TEMP_DISPLAY
+  - id: STATUS_ID_TEMP_PRODUCT
+  - id: STATUS_ID_ALARM_HIGH_INT_TEMP
+  - id: STATUS_ID_ALARM_LOW_INT_TEMP
+  - id: STATUS_ID_ALARM_HIGH_COND_TEMP
+  - id: STATUS_ID_ALARM_LOW_CAPACITY
+  - id: STATUS_ID_ALARM_EXT_IN
+  - id: STATUS_ID_ALARM_DOOR_OPEN
+  - id: STATUS_ID_ALARM_PROBE
+  - id: STATUS_ID_ALARM_INV_COMM
+  - id: STATUS_ID_ALARM_DEFROST
+  - id: STATUS_ID_ALARM_RTC
+  - id: STATUS_ID_ALARM_HIGH_AUX_TEMP
+  - id: STATUS_ID_ALARM_LOW_AUX_TEMP
+  - id: STATUS_ID_ALARM_HIGH_VOLTAGE
+  - id: STATUS_ID_ALARM_LOW_VOLTAGE
+  - id: STATUS_ID_THERM_STATE
+  - id: STATUS_ID_DEFROST_STATE
+  - id: STATUS_ID_CONTROLLER_STATE
+  - id: STATUS_ID_COMP_SPEED
+  - id: STATUS_ID_COMP_SET_SPEED
+  - id: STATUS_ID_COMP_POWER
+  - id: STATUS_ID_COMP_OP_STATUS
+  - id: STATUS_ID_EVAP_FAN_SPEED
+  - id: STATUS_ID_COND_FAN_SPEED
+  - id: PARAM_SESSION_OPEN
+  - id: PARAM_PSWD_LEVEL1
+  - id: PARAM_PSWD_LEVEL2
+  - id: PARAM_PSWD_LEVEL_CTRL_ENABLE
+  - id: PARAM_PSWD_LEVEL_RS485_ENABLE
+  - id: PARAM_TH_SETPOINT
+  - id: PARAM_TH_HYSTERESIS
+  - id: PARAM_TH_MIN_SETPOINT
+  - id: PARAM_TH_MAX_SETPOINT
+  - id: PARAM_TH_PULLDOWN_STARTUP_EN
+  - id: PARAM_TH_PULLDOWN_TEMP_TRIG
+  - id: PARAM_TH_PULLDOWN_SPEED
+  - id: PARAM_TH_RECOVERY_DELTA_TEMP
+  - id: PARAM_TH_PROBE_FAULT_ON_TIME
+  - id: PARAM_TH_PROBE_FAULT_OFF_TIME
+  - id: PARAM_TH_PROBE_FAULT_SPEED
+  - id: PARAM_TH_PULLDOWN_TIMEOUT
+  - id: PARAM_COMP_CTRL_TYPE
+  - id: PARAM_COMP_MIN_OFF_TIME
+  - id: PARAM_COMP_MIN_ON_TIME
+  - id: PARAM_COMP_MIN_START_PERIOD
+  - id: PARAM_DEF_TYPE
+  - id: PARAM_DEF_TIMEOUT_VALUE
+  - id: PARAM_DEF_EVAP_TEMP_VALUE
+  - id: PARAM_DEF_MAX_EVAP_TEMP_VALUE
+  - id: PARAM_DEF_DRIPPING_PERIOD
+  - id: PARAM_DEF_TRIG
+  - id: PARAM_DEF_TRIG_PERIOD
+  - id: PARAM_DEF_TRIG_MAX_PERIOD
+  - id: PARAM_DEF_TRIG_PERIOD_PULLDOWN
+  - id: PARAM_DEF_TRIG_SCHED_TIME_1
+  - id: PARAM_DEF_TRIG_SCHED_TIME_2
+  - id: PARAM_DEF_TRIG_SCHED_TIME_3
+  - id: PARAM_DEF_TRIG_SCHED_TIME_4
+  - id: PARAM_DEF_ADP_DELTA_TRIG
+  - id: PARAM_DEF_ADP_FILTER_LEVEL
+  - id: PARAM_DEF_ADP_STAB_FILTER_PERIOD
+  - id: PARAM_DEF_ADP_TRIG_MIN_PERIOD
+  - id: PARAM_DEF_MAX_COMP_ON_PERIOD
+  - id: PARAM_DEF_TRIG_STARTUP
+  - id: PARAM_DEF_ABSOLUTE_TRIGGER
+  - id: PARAM_DEF_SPEED
+  - id: PARAM_DEF_POST_DEFROST_SPEED
+  - id: PARAM_DEF_POST_DEFROST_TIMEOUT
+  - id: PARAM_DEF_PRE_DEF_PERIOD
+  - id: PARAM_DEF_AUX_LOAD_CFG
+  - id: PARAM_DEF_IHM_TEMP
+  - id: PARAM_DEF_IHM_TEMP_DELTA
+  - id: PARAM_DEF_IHM_TIMEOUT_VALUE
+  - id: PARAM_EVAP_MODE
+  - id: PARAM_EVAP_DEF_STATE
+  - id: PARAM_EVAP_DELAY_POST_DEF
+  - id: PARAM_EVAP_ON_TEMP
+  - id: PARAM_EVAP_OFF_DELTA_TEMP
+  - id: PARAM_EVAP_PULSED_ON_TIME
+  - id: PARAM_EVAP_PULSED_OFF_TIME
+  - id: PARAM_EVAP_CTRL_TYPE
+  - id: PARAM_EVAP_FAN_VAR_CTRL_MODE
+  - id: PARAM_EVAP_FAN_VAR_RATE
+  - id: PARAM_EVAP_FAN_VAR_STANDBY_SPD
+  - id: PARAM_EVAP_FAN_VAR_CYCLE_SPD
+  - id: PARAM_EVAP_FAN_VAR_RECOVERY_SPD
+  - id: PARAM_EVAP_FAN_VAR_DEFROST_SPD
+  - id: PARAM_EVAP_FAN_VAR_PULLDOWN_SPD
+  - id: PARAM_EVAP_FAN_VAR_RECOVERY_DELTA_TEMP
+  - id: PARAM_EVAP_FAN_VAR_MIN_DELTA_TEMP_CTRL
+  - id: PARAM_EVAP_FAN_VAR_MAX_TEMP_CTRL
+  - id: PARAM_EVAP_FAN_VAR_MIN_COMP_CTRL
+  - id: PARAM_EVAP_FAN_VAR_MAX_COMP_CTRL
+  - id: PARAM_EVAP_FAN_DOOR_REV_TIME
+  - id: PARAM_EVAP_FAN_DOOR_STANDBY_TIME
+  - id: PARAM_COND_MODE
+  - id: PARAM_COND_COMP_ON_DELAY
+  - id: PARAM_COND_COMP_OFF_DELAY
+  - id: PARAM_COND_DEF_STATE
+  - id: PARAM_COND_ON_TEMP
+  - id: PARAM_COND_OFF_TEMP
+  - id: PARAM_COND_CTRL_TYPE
+  - id: PARAM_COND_FAN_VAR_CTRL_MODE
+  - id: PARAM_COND_FAN_VAR_RATE
+  - id: PARAM_COND_FAN_VAR_STANDBY_SPD
+  - id: PARAM_COND_FAN_VAR_CYCLE_SPD
+  - id: PARAM_COND_FAN_VAR_RECOVERY_SPD
+  - id: PARAM_COND_FAN_VAR_DEFROST_SPD
+  - id: PARAM_COND_FAN_VAR_PULLDOWN_SPD
+  - id: PARAM_COND_FAN_VAR_RECOVERY_COMP_SPD
+  - id: PARAM_COND_FAN_VAR_MIN_TEMP_CTRL
+  - id: PARAM_COND_FAN_VAR_MAX_TEMP_CTRL
+  - id: PARAM_COND_FAN_VAR_MIN_COMP_CTRL
+  - id: PARAM_COND_FAN_VAR_MAX_COMP_CTRL
+  - id: PARAM_DOOR_HEAT_MODE
+  - id: PARAM_DOOR_HEAT_DELTA_TO_AMB
+  - id: PARAM_DOOR_HEAT_HYST
+  - id: PARAM_DOOR_HEAT_DUTY_CYCLE
+  - id: PARAM_DOOR_HEAT_TEMP_CTRL_EN
+  - id: PARAM_LIGHTS_TEMP_CTRL_EN
+  - id: PARAM_VCC_SPEED_MAX
+  - id: PARAM_VCC_SPEED_MIN
+  - id: PARAM_VCC_RPM_HZ
+  - id: PARAM_VCC_CTRL_MODE
+  - id: PARAM_VCC_KP
+  - id: PARAM_VCC_KI
+  - id: PARAM_VCC_KD
+  - id: PARAM_VCC_CYCLE_END_STAB_TIME
+  - id: PARAM_VCC_TTO
+  - id: PARAM_VCC_TTO_TIMEOUT
+  - id: PARAM_VCC_MSS
+  - id: PARAM_VCC_DISTURB_TIME
+  - id: PARAM_VCC_SHORT_CYCLE_DAMPENING
+  - id: PARAM_VCC_TRANSITION_TIME
+  - id: PARAM_VCC_CUT_OFF_DELTA
+  - id: PARAM_VCC_FIXED_SPEED_SPEED
+  - id: PARAM_ALARM_HIGH_INT_TEMP_CFG
+  - id: PARAM_ALARM_HIGH_INT_TEMP_VALUE
+  - id: PARAM_ALARM_HIGH_INT_TEMP_DELAY
+  - id: PARAM_ALARM_HIGH_INT_TEMP_STARTUP_DELAY
+  - id: PARAM_ALARM_HIGH_INT_TEMP_DEFROST_DELAY
+  - id: PARAM_ALARM_LOW_INT_TEMP_CFG
+  - id: PARAM_ALARM_LOW_INT_TEMP_VALUE
+  - id: PARAM_ALARM_LOW_INT_TEMP_DELAY
+  - id: PARAM_ALARM_HIGH_COND_TEMP_CFG
+  - id: PARAM_ALARM_HIGH_COND_TEMP_VALUE
+  - id: PARAM_ALARM_HIGH_COND_TEMP_DELAY
+  - id: PARAM_ALARM_LOW_CAPACITY_CFG
+  - id: PARAM_ALARM_LOW_CAPACITY_PERIOD
+  - id: PARAM_ALARM_EXT_IN_CFG
+  - id: PARAM_ALARM_EXT_IN_DELAY
+  - id: PARAM_ALARM_DOOR_OPEN_CFG
+  - id: PARAM_ALARM_DOOR_OPEN_DELAY
+  - id: PARAM_ALARM_PROBE_CFG
+  - id: PARAM_ALARM_INV_COMM_CFG
+  - id: PARAM_ALARM_DEFROST_CFG
+  - id: PARAM_ALARM_RTC_CFG
+  - id: PARAM_ALARM_HIGH_AUX_TEMP_CFG
+  - id: PARAM_ALARM_HIGH_AUX_TEMP_VALUE
+  - id: PARAM_ALARM_HIGH_AUX_TEMP_DELAY
+  - id: PARAM_ALARM_LOW_AUX_TEMP_CFG
+  - id: PARAM_ALARM_LOW_AUX_TEMP_VALUE
+  - id: PARAM_ALARM_LOW_AUX_TEMP_DELAY
+  - id: PARAM_ALARM_BUS_VOLTAGE_CFG
+  - id: PARAM_ALARM_BUS_VOLTAGE_HIGH
+  - id: PARAM_ALARM_BUS_VOLTAGE_HIGH_DELTA
+  - id: PARAM_ALARM_BUS_VOLTAGE_LOW
+  - id: PARAM_ALARM_BUS_VOLTAGE_LOW_DELTA
+  - id: PARAM_IN_MODE_1
+  - id: PARAM_IN_MODE_2
+  - id: PARAM_IN_MODE_3
+  - id: PARAM_IN_MODE_4
+  - id: PARAM_IN_MODE_5
+  - id: PARAM_PROBE_MODEL
+  - id: PARAM_PROBE_OFFSET_1
+  - id: PARAM_PROBE_OFFSET_2
+  - id: PARAM_PROBE_OFFSET_3
+  - id: PARAM_PROBE_OFFSET_4
+  - id: PARAM_PROBE_OFFSET_5
+  - id: PARAM_CUSTOM_NTC_T_REF
+  - id: PARAM_CUSTOM_NTC_R_REF
+  - id: PARAM_CUSTOM_NTC_BETA_A
+  - id: PARAM_CUSTOM_NTC_BETA_B
+  - id: PARAM_DIG_CONF_1
+  - id: PARAM_DIG_CONF_2
+  - id: PARAM_DIG_CONF_3
+  - id: PARAM_DIG_CONF_4
+  - id: PARAM_DIG_CONF_5
+  - id: PARAM_DIG_DELAY
+  - id: PARAM_RELAY_MODE_1
+  - id: PARAM_RELAY_MODE_2
+  - id: PARAM_RELAY_MODE_3
+  - id: PARAM_RELAY_MODE_4
+  - id: PARAM_IHM_TEMP_UNIT
+  - id: PARAM_IHM_REDUCED_BRIGHT_ENABLE
+  - id: PARAM_IHM_REDUCED_BRIGHT_MIN
+  - id: PARAM_IHM_REDUCED_BRIGHT_MAX
+  - id: PARAM_IHM_TEMP_OFFSET
+  - id: PARAM_IHM_TEMP_INPUT
+  - id: PARAM_IHM_TIME_TO_KEY_LOCK
+  - id: PARAM_COMM_MB_BAUDRATE
+  - id: PARAM_COMM_MB_SLAVE_ADDR
+  - id: PARAM_COMM_MB_STOP_BIT
+  - id: PARAM_DATALOG_PERIOD
+  - id: PARAM_DATALOG_ENABLE
+  - id: PARAM_DEV_BUS_MODE
+  - id: PARAM_OVERRIDE_ENABLE
+  - id: PARAM_OVERRIDE_RELAY_1
+  - id: PARAM_OVERRIDE_RELAY_2
+  - id: PARAM_OVERRIDE_RELAY_3
+  - id: PARAM_OVERRIDE_RELAY_4
+  - id: PARAM_OVERRIDE_COMP_SPEED
+  - id: PARAM_OVERRIDE_EVAP_SPEED
+  - id: PARAM_OVERRIDE_COND_SPEED

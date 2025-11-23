@@ -4,24 +4,17 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-// 60 days for now, saves SD card space on Pi Zero. Might need to
-// bump back to 90 if customers complain about missing seasonal data.
-// SD card is 16GB and the DB can hit ~500MB at 60d retention on a
-// gateway with 40+ registers polled at 1s intervals.
-const RETENTION_SECS: i64 = 60 * 24 * 3600;
+// 90 days. Customers with seasonal HVAC cycles
+// want to compare "same week last year". 90 is a compromise because
+// the Pi's SD card is only 16GB and the DB can hit ~800MB on a gateway
+// with 40+ registers polled at 1s intervals.
+const RETENTION_SECS: i64 = 90 * 24 * 3600;
 
-// Floor for how many rows we accumulate before the next prune.
-// Without this the DELETE on open can take 10+ seconds on a Pi Zero
+// floor for how many rows we'll accumulate before the next prune.
+// without this the DELETE on open can take 10+ seconds on a Pi Zero
 // after a long uptime, and the UI just shows a spinner. We now prune
 // incrementally via prune_if_needed() instead.
-const PRUNE_BATCH: i64 = 25_000;
-
-// FIXME: PRUNE_BATCH might be too aggressive on Pi Zero
-// saw the prune take 4s on a fresh Pi Zero 2W with 16GB card
-// maybe we should scale this based on available memory?
-// let batch = if cfg!(target_arch = "aarch64") { 25_000 } else { 50_000 };
-// also: should prune_old_rows use a transaction? currently it doesn't
-// and I wonder if WAL mode covers us here
+const PRUNE_BATCH: i64 = 50_000;
 
 #[derive(Debug, Clone)]
 pub struct HistoryDb {

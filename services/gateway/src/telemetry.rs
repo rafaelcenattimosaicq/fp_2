@@ -48,11 +48,6 @@ pub fn build_telemetry_json(
     serde_json::Value::Object(sorted)
 }
 
-// fn _debug_dump_json(json: &serde_json::Value) {
-//     eprintln!("telemetry payload: {}", serde_json::to_string_pretty(json).unwrap());
-//     eprintln!("  keys: {}", json.as_object().map_or(0, |m| m.len()));
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
