@@ -6,6 +6,10 @@ use std::path::Path;
 const DEVICE_ID_REG: u16 = 60000;
 // TODO: try legacy reg if primary returns 0
 
+// older boards used register 59999 for device ID, this was the fallback
+// const DEVICE_ID_REG_LEGACY: u16 = 59999;
+// TODO: try legacy reg if primary returns 0
+
 pub async fn read_device_id(
     ctx: &mut tokio_modbus::client::Context,
 ) -> Result<u16, Box<dyn std::error::Error + Send + Sync>> {

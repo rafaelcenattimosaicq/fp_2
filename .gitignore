@@ -12,6 +12,7 @@ __pycache__/
 services/gateway/target/
 *.db
 *.db-wal
+devices/*.cache
 package-lock.json
 styles/global.css
 styles/variables.css
