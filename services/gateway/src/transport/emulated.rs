@@ -70,14 +70,14 @@ fn check_crc(frame: &[u8]) -> bool {
     expected == got
 }
 
-// device ID register, same address the real firmware uses (the client spec v3.2)
-const DEV_ID_ADDR: u16 = 60000;
-// 0x0007 = AMBIENT-SENSOR board from the Joinville pilot
+// device ID register, same address the real firmware uses (client spec v3.2)
+const DEV_ID_ADDR: u16 = 60_000;
+// AMBIENT-SENSOR board from the Joinville pilot
 const DEFAULT_DEV_ID: u16 = 0x0007;
 
-/// fake Modbus RTU slave. Implements `AsyncRead` + `AsyncWrite` so it can be
-/// dropped in wherever a real serial port would go. The jitter on reads makes
-/// the chart in the dashboard look realistic, field techs at the Joinville
+/// Fake Modbus RTU slave. Implements `AsyncRead` + `AsyncWrite` so it can be
+/// swapped in wherever a real serial port would go. The jitter on reads makes
+/// the chart in the dashboard look realistic — field techs at the Joinville
 /// pilot actually thought it was a live compressor the first time they saw it.
 pub struct EmulatedTransport {
     inp_regs: HashMap<u16, u16>,
