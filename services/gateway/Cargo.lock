@@ -497,7 +497,9 @@ name = "gateway"
 version = "0.1.0"
 dependencies = [
  "btleplug",
+ "bytes",
  "chrono",
+ "futures",
  "reqwest",
  "rumqttc",
  "rusqlite",

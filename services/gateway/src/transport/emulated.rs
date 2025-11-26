@@ -70,6 +70,11 @@ fn check_crc(frame: &[u8]) -> bool {
     expected == got
 }
 
+// dbg!(&frame[..frame.len()-2], expected, got);
+// eprintln!("CRC check: expected=0x{:04X} got=0x{:04X} match={}", expected, got, expected == got);
+// let _hex: String = frame.iter().map(|b| format!("{:02X} ", b)).collect();
+// eprintln!("  frame bytes: {_hex}");
+
 // device ID register, same address the real firmware uses (client spec v3.2)
 const DEV_ID_ADDR: u16 = 60_000;
 // AMBIENT-SENSOR board from the Joinville pilot
