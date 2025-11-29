@@ -9,6 +9,7 @@ mod state;
 mod storage;
 mod telemetry;
 mod transport;
+mod ui;
 mod vpn;
 
 fn main() {
