@@ -14,6 +14,12 @@ use std::time::Duration;
 use tokio_modbus::prelude::{rtu, Reader, Slave};
 use tokio_serial::SerialPortBuilderExt;
 
+// #[cfg(test)]
+// const POLL_TIMEOUT_MS: u64 = 500;
+// #[cfg(not(test))]
+// const POLL_TIMEOUT_MS: u64 = 3000;
+// FIXME: use cfg-if crate instead of this verbose pattern
+
 struct LiveDevice {
     batches: Vec<RegBatch>,
     writable_params: Vec<Register>,
