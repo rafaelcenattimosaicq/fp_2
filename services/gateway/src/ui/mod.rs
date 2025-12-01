@@ -64,6 +64,10 @@ const PAD: f32 = 8.0;
 const PAD_I8: i8 = PAD as i8;
 const DOT_R: f32 = 5.0;
 
+// tried DOT_R=4.0 but the status dots were hard to see on
+// the Waveshare 7" display at arm's length, 5.0 is better
+// const _OLD_DOT_R: f32 = 4.0;
+
 impl eframe::App for GatewayApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // 250ms repaint, tested on Pi 4 (VideoCore VI). Going below 200ms
@@ -90,10 +94,7 @@ impl eframe::App for GatewayApp {
                 });
             });
 
-        // tab bar sits right below the status strip. The 4px vertical margin
-        // keeps the buttons from crowding the top border on the Waveshare
-        // 7" display (its touch calibration is slightly off near the edges,
-        // reported by the the client Joinville site crew during install).
+        // tab bar below
         egui::TopBottomPanel::top("tabs")
             .exact_height(TOUCH_MIN + 4.0)
             .frame(egui::Frame::NONE
@@ -181,10 +182,7 @@ fn status_pill(ui: &mut egui::Ui, status: &crate::state::ConnectionStatus, prefi
 // ---------------------------------------------------------------------------
 // color palette
 // ---------------------------------------------------------------------------
-// lifted from Cloud Desktop's variables.css (the Sentinel light theme).
-// tried a dark theme early on but readability was terrible under the
-// fluorescent lights on the the factory floor, switched to light
-// and never looked back.
+
 
 const BG_CANVAS: egui::Color32 = egui::Color32::from_rgb(0xf5, 0xf5, 0xf7);
 const BG_PRIMARY: egui::Color32 = egui::Color32::from_rgb(0xff, 0xff, 0xff);
@@ -195,17 +193,16 @@ const TEXT_PRIMARY: egui::Color32 = egui::Color32::from_rgb(0x1d, 0x1d, 0x1f);
 const TEXT_DIM: egui::Color32 = egui::Color32::from_rgb(0x86, 0x86, 0x8b);
 
 const BORDER: egui::Color32 = egui::Color32::from_rgb(0xd4, 0xd4, 0xd4);
-const ACCENT: egui::Color32 = egui::Color32::from_rgb(0x00, 0xA0, 0xB0);   // teal, same as Cloud Desktop
+const ACCENT: egui::Color32 = egui::Color32::from_rgb(0x00, 0xA0, 0xB0); 
 const ACCENT_LIT: egui::Color32 = egui::Color32::from_rgb(0x2B, 0xB5, 0xC4);
 
-#[allow(dead_code)] // used in selection highlight, kept for visual consistency
+#[allow(dead_code)]
 const SELECTION: egui::Color32 = egui::Color32::from_rgba_premultiplied(0x00, 0xA0, 0xB0, 0x30);
 
 const STATUS_GREEN: egui::Color32 = egui::Color32::from_rgb(0x34, 0xC7, 0x59);
 const STATUS_AMBER: egui::Color32 = egui::Color32::from_rgb(0xFF, 0x95, 0x00);
 const STATUS_RED: egui::Color32 = egui::Color32::from_rgb(0xFF, 0x3B, 0x30);
 
-// aliases kept so submodules can reference them without `super::TEXT_DIM` etc.
 #[allow(dead_code)] pub const TEXT_SECONDARY: egui::Color32 = TEXT_DIM;
 #[allow(dead_code)] pub const TEXT_MUTED: egui::Color32 = TEXT_DIM;
 #[allow(dead_code)] pub const BORDER_DEFAULT: egui::Color32 = BORDER;
@@ -263,21 +260,16 @@ fn apply_theme(ctx: &egui::Context) {
     ctx.style_mut(|s| {
         s.spacing.item_spacing = egui::vec2(6.0, 4.0);
         s.spacing.button_padding = egui::vec2(10.0, 4.0);
-        // 30px interact height — compromise between touch-friendly and
-        // not wasting the 600px we have. The actual touch targets (tabs,
-        // connect button) override this with min_size anyway.
+        // 30px  hght
         s.spacing.interact_size.y = 30.0;
 
-        // 13px body — readable at arm's length on a 7" display without
-        // eating too much vertical space
+        // 13px body
         s.text_styles.insert(egui::TextStyle::Body, egui::FontId::proportional(13.0));
         s.text_styles.insert(egui::TextStyle::Button, egui::FontId::proportional(13.0));
     });
 }
 
-/// standard card frame for grouped content. Not every panel uses this -
-/// the log view and serial monitor skip the border to maximise scroll
-/// area on the 480px-tall Pi display.
+/// standard card frame 
 pub fn section_frame(_ui: &egui::Ui) -> egui::Frame {
     egui::Frame::NONE
         .fill(BG_SECONDARY)
@@ -286,9 +278,8 @@ pub fn section_frame(_ui: &egui::Ui) -> egui::Frame {
         .stroke(egui::Stroke::new(1.0, BORDER))
 }
 
-/// lighter wrapper without the border, used by views that already sit
-/// inside a scroll area and don't need the extra visual weight.
-#[allow(dead_code, reason = "available for future views that sit inside scroll areas")]
+/// wrapper
+#[allow(dead_code, reason = "future")]
 pub fn bare_frame() -> egui::Frame {
     egui::Frame::NONE
         .fill(BG_SECONDARY)

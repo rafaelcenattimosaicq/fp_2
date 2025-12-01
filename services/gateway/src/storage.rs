@@ -4,16 +4,11 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-// 90 days. Customers with seasonal HVAC cycles
-// want to compare "same week last year". 90 is a compromise because
-// the Pi's SD card is only 16GB and the DB can hit ~800MB on a gateway
-// with 40+ registers polled at 1s intervals.
+
 const RETENTION_SECS: i64 = 90 * 24 * 3600;
 
 // floor for how many rows we'll accumulate before the next prune.
-// without this the DELETE on open can take 10+ seconds on a Pi Zero
-// after a long uptime, and the UI just shows a spinner. We now prune
-// incrementally via prune_if_needed() instead.
+// without this the DELETE on open can take 10+ seconds on a Pi
 const PRUNE_BATCH: i64 = 50_000;
 
 #[derive(Debug, Clone)]
@@ -24,20 +19,19 @@ pub struct HistoryDb {
 
 impl HistoryDb {
     pub fn open(gateway_id: &str) -> Result<Self, rusqlite::Error> {
-        let path = db_path(gateway_id);
+        let p = get_db(gateway_id);
 
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+        if let Some(d) = p.parent() {
+            let _ = std::fs::create_dir_all(d);
         }
 
-        let conn = Connection::open(&path)?;
+        let conn = Connection::open(&p)?;
 
         // wAL is non-negotiable: the UI polls query_range() every 2s while
         // insert_poll() is still running from the Modbus loop. Without WAL the
         // uI thread blocks on the writer and the chart stutters visibly.
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
-        // 3000ms busy timeout, saw deadlocks on the CM4 with the default.
-        // could probably be lower now that we batch inserts but haven't tested.
+        // 3000ms busy timeout, saw deadlocks on the CM4 with the default
         conn.execute_batch("PRAGMA busy_timeout=3000;")?;
 
         conn.execute_batch(
@@ -53,22 +47,11 @@ impl HistoryDb {
                 ON register_history(register_id, timestamp_ms);",
         )?;
 
-        // do one big prune on startup to catch up if we've been offline a while,
-        // but only if the table already exists (first run = nothing to prune)
-        let cutoff_ms = now_ms() - RETENTION_SECS * 1000;
-        let pruned = conn.execute(
+        let c = millis() - RETENTION_SECS * 1000;
+        let _pruned = conn.execute(
             "DELETE FROM register_history WHERE timestamp_ms < ?1",
-            params![cutoff_ms],
+            params![c],
         )?;
-        if pruned > 0 {
-            tracing::info!(pruned, "startup prune");
-        }
-
-        tracing::info!(
-            path = %path.display(),
-            "History database opened"
-        );
-
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
             rows_since_prune: Arc::new(std::sync::atomic::AtomicU32::new(0)),
@@ -77,63 +60,51 @@ impl HistoryDb {
 
     #[allow(clippy::cast_precision_loss)]
     pub fn insert_poll(&self, values: &HashMap<String, RegisterValue>) {
-        let Ok(conn) = self.conn.lock() else { return };
-        let ts = now_ms();
+        let Ok(db) = self.conn.lock() else { return };
+        let t = millis();
 
-        let Ok(tx) = conn.unchecked_transaction() else {
-            tracing::warn!("could not begin transaction");
+        let Ok(tx) = db.unchecked_transaction() else {
             return;
         };
 
-        let mut inserted = 0u32;
-        for (register_id, value) in values {
-            let numeric = match value {
+        let mut n = 0u32;
+        for (rid, val) in values {
+            let x = match val {
                 RegisterValue::Float(f) => Some(*f),
                 RegisterValue::Unsigned(u) => Some(*u as f64),
                 RegisterValue::Boolean(b) => Some(if *b { 1.0 } else { 0.0 }),
                 RegisterValue::Enum(_) | RegisterValue::Bitwise(_) => None,
             };
 
-            if let Some(v) = numeric {
-                if let Err(e) = tx.execute(
+            if let Some(v) = x {
+                let _ = tx.execute(
                     "INSERT INTO register_history (timestamp_ms, register_id, value) VALUES (?1, ?2, ?3)",
-                    params![ts, register_id, v],
-                ) {
-                    // this fires when the SD card is full on field units, worth
-                    // logging so the tech doesn't stare at an empty chart for 20 min
-                    // wondering why there's no data. Ask me how I know.
-                    tracing::warn!(register = %register_id, error = %e, "history insert failed");
-                }
-                inserted += 1;
+                    params![t, rid, v],
+                );
+                n += 1;
             }
         }
 
         let _ = tx.commit();
 
-        let total = self.rows_since_prune.fetch_add(inserted, std::sync::atomic::Ordering::Relaxed);
+        let tmp = self.rows_since_prune.fetch_add(n, std::sync::atomic::Ordering::Relaxed);
         #[allow(clippy::cast_possible_truncation, reason = "PRUNE_BATCH is a small constant that fits in u32")]
-        if total + inserted > PRUNE_BATCH as u32 {
-            drop(conn);
-            self.prune_old_rows();
+        if tmp + n > PRUNE_BATCH as u32 {
+            drop(db);
+            self.prune_old();
         }
     }
 
-    fn prune_old_rows(&self) {
-        let Ok(conn) = self.conn.lock() else { return };
-        let cutoff = now_ms() - RETENTION_SECS * 1000;
+    fn prune_old(&self) {
+        let Ok(db) = self.conn.lock() else { return };
+        let c = millis() - RETENTION_SECS * 1000;
 
-        // dELETE with LIMIT isn't standard SQLite, so we use a subquery.
-        // this keeps the prune under ~50ms even on slow SD cards.
-        match conn.execute(
+        let _ = db.execute(
             "DELETE FROM register_history WHERE id IN (
                 SELECT id FROM register_history WHERE timestamp_ms < ?1 LIMIT 10000
             )",
-            params![cutoff],
-        ) {
-            Ok(n) if n > 0 => tracing::debug!(n, "incremental prune"),
-            Ok(_) => {}
-            Err(e) => tracing::warn!("prune failed: {e}"),
-        }
+            params![c],
+        );
         self.rows_since_prune.store(0, std::sync::atomic::Ordering::Relaxed);
     }
 
@@ -143,12 +114,12 @@ impl HistoryDb {
         end_ms: i64,
         register_ids: &[String],
     ) -> Vec<(i64, String, f64)> {
-        let Ok(conn) = self.conn.lock() else {
+        let Ok(db) = self.conn.lock() else {
             return Vec::new();
         };
 
         if register_ids.is_empty() {
-            let Ok(mut stmt) = conn.prepare(
+            let Ok(mut s) = db.prepare(
                 "SELECT timestamp_ms, register_id, value FROM register_history
                  WHERE timestamp_ms BETWEEN ?1 AND ?2
                  ORDER BY timestamp_ms ASC",
@@ -156,32 +127,31 @@ impl HistoryDb {
                 return Vec::new();
             };
 
-            stmt.query_map(params![start_ms, end_ms], |row| {
+            s.query_map(params![start_ms, end_ms], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })
             .map_or_else(|_| Vec::new(), |rows| rows.filter_map(Result::ok).collect())
         } else {
-            // can't use a static prepared statement here because the number of
-            // register_ids varies. The placeholders are positional (?3, ?4, ...)
-            // which is ugly but avoids any SQL injection since they're all bound.
-            let placeholders: Vec<String> = register_ids
+            // cant use a static prepared statement here because the number of
+            // register_ids varies, the placeholders are positional (?3, ?4, ...)
+            let ph: Vec<String> = register_ids
                 .iter()
                 .enumerate()
                 .map(|(i, _)| format!("?{}", i + 3))
                 .collect();
-            let sql = format!(
+            let q = format!(
                 "SELECT timestamp_ms, register_id, value FROM register_history
                  WHERE timestamp_ms BETWEEN ?1 AND ?2
                  AND register_id IN ({})
                  ORDER BY timestamp_ms ASC",
-                placeholders.join(", ")
+                ph.join(", ")
             );
 
-            let Ok(mut stmt) = conn.prepare(&sql) else {
+            let Ok(mut s) = db.prepare(&q) else {
                 return Vec::new();
             };
 
-            let params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = {
+            let stuff: Vec<Box<dyn rusqlite::types::ToSql>> = {
                 let mut v: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
                 v.push(Box::new(start_ms));
                 v.push(Box::new(end_ms));
@@ -191,10 +161,10 @@ impl HistoryDb {
                 v
             };
 
-            let param_refs: Vec<&dyn rusqlite::types::ToSql> =
-                params_vec.iter().map(AsRef::as_ref).collect();
+            let refs: Vec<&dyn rusqlite::types::ToSql> =
+                stuff.iter().map(AsRef::as_ref).collect();
 
-            stmt.query_map(param_refs.as_slice(), |row| {
+            s.query_map(refs.as_slice(), |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })
             .map_or_else(|_| Vec::new(), |rows| rows.filter_map(Result::ok).collect())
@@ -216,23 +186,19 @@ impl HistoryDb {
             .map_or_else(|_| Vec::new(), |rows| rows.filter_map(Result::ok).collect())
     }
 
-    /// rough row count for the status page. Not exact, we don't want to
-    /// pay for a full COUNT(*) on every UI refresh.
     #[allow(dead_code, reason = "reserved for the status page UI that shows disk usage")]
     pub fn approx_row_count(&self) -> Option<i64> {
         let conn = self.conn.lock().ok()?;
-        // this reads from sqlite_stat1 which is only populated after ANALYZE.
-        // falls back to max(rowid) which over-counts if rows were deleted but
-        // is close enough for a "disk usage" indicator in the UI.
         conn.query_row(
             "SELECT MAX(id) FROM register_history", [], |r| r.get(0),
         ).ok()
     }
 }
 
-fn db_path(gateway_id: &str) -> PathBuf {
-    let base = dirs_fallback();
-    base.join("gateway").join(gateway_id).join("history.db")
+// renamed from db_path, shorter
+fn get_db(gateway_id: &str) -> PathBuf {
+    let x = dirs_fallback();
+    x.join("gateway").join(gateway_id).join("history.db")
 }
 
 fn dirs_fallback() -> PathBuf {
@@ -240,11 +206,12 @@ fn dirs_fallback() -> PathBuf {
         .or_else(|_| std::env::var("USERPROFILE"))
         .map_or_else(
             |_| PathBuf::from("."),
-            |h| PathBuf::from(h).join(".local").join("share"),
+            |v| PathBuf::from(v).join(".local").join("share"),
         )
 }
 
-fn now_ms() -> i64 {
+// renamed from now_ms
+fn millis() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
