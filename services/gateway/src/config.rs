@@ -144,17 +144,16 @@ pub struct VpnConfig {
     pub pre_shared_secret: Option<String>,
 }
 
-/// Minimum poll interval we honour. 75ms is pushing it on the RS-485
-/// transceiver but the FMF80 compressor needs faster sampling during
-/// startup transients.
-const MIN_POLL_INTERVAL_MS: u64 = 75;
+/// minimum poll interval we'll actually honour. Anything below this and the
+/// modbus RTU bus can't turnaround in time on the RS-485 transceiver, plus
+/// the Pi's CPU pegs at 100% trying to keep up.
+const MIN_POLL_INTERVAL_MS: u64 = 100;
 
-pub fn load_config(path: &Path) -> Result<GatewayConfig, Box<dyn std::error::Error + Send + Sync>> {
-    let raw = std::fs::read_to_string(path)?;
-    let mut config: GatewayConfig = serde_yaml::from_str(&raw)?;
+pub fn load_config(path: &Path) -> Result<GatewayConfig, Box<dyn std::error::Error>> {
+    let contents = std::fs::read_to_string(path)?;
+    let mut config: GatewayConfig = serde_yaml::from_str(&contents)?;
 
     if config.poll_interval_ms < MIN_POLL_INTERVAL_MS {
-        tracing::warn!("poll_interval_ms {} < min {}, clamping", config.poll_interval_ms, MIN_POLL_INTERVAL_MS);
         config.poll_interval_ms = MIN_POLL_INTERVAL_MS;
     }
 

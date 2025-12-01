@@ -16,14 +16,6 @@ pub struct ConnectionState {
     pub transport: ConnectionTransport,
 }
 
-// fn _format_poll_interval(ms: Option<u64>) -> String {
-//     match ms {
-//         Some(t) if t >= 1000 => format!("{:.1}s", t as f64 / 1000.0),
-//         Some(t) => format!("{}ms", t),
-//         None => "—".into(),
-//     }
-// }
-
 #[allow(clippy::too_many_lines, reason = "connection panel requires sequential layout logic; splitting would hurt readability")]
 pub fn render(
     ui: &mut egui::Ui,
