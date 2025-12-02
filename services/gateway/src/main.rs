@@ -22,6 +22,16 @@ use std::time::Duration;
 
 fn is_headless() -> bool { std::env::args().any(|a| a == "--headless") }
 
+// fn _dump_env() {
+//     eprintln!("--- gateway environment ---");
+//     for (k, v) in std::env::vars() {
+//         if k.starts_with("GATEWAY_") || k.starts_with("NES_") {
+//             eprintln!("  {k}={v}");
+//         }
+//     }
+//     eprintln!("--- end ---");
+// }
+
 fn main() {
     init_tracing();
 
