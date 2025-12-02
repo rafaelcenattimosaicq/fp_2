@@ -34,16 +34,16 @@ pub fn build_telemetry_json(
         map.insert(name.clone(), json_value);
     }
 
-    // ingest pipeline expects epoch millis, not seconds.
-    let ts_millis = chrono::Utc::now().timestamp_millis();
-    map.insert("timestamp".to_string(), serde_json::json!(ts_millis));
+    // cloud ingest pipeline expects epoch millis, not seconds.
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    map.insert("timestamp".to_string(), serde_json::json!(now_ms));
 
-    // sort keys so the JSON is deterministic, makes debugging mqtt payloads
-    // much less painful when eyeballing broker logs
-    let sorted: serde_json::Map<String, serde_json::Value> = map
-        .into_iter()
-        .collect::<std::collections::BTreeMap<_, _>>()
-        .into_iter().collect();
+    // sort keys so the JSON is deterministic, makes debugging MQTT payloads
+    // much less painful when eyeballing broker logs.
+    let sorted: serde_json::Map<String, serde_json::Value> =
+        map.into_iter().collect::<std::collections::BTreeMap<_, _>>()
+            .into_iter()
+            .collect();
 
     serde_json::Value::Object(sorted)
 }
