@@ -64,10 +64,6 @@ const PAD: f32 = 8.0;
 const PAD_I8: i8 = PAD as i8;
 const DOT_R: f32 = 5.0;
 
-// tried DOT_R=4.0 but the status dots were hard to see on
-// the Waveshare 7" display at arm's length, 5.0 is better
-// const _OLD_DOT_R: f32 = 4.0;
-
 impl eframe::App for GatewayApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // 250ms repaint, tested on Pi 4 (VideoCore VI). Going below 200ms
