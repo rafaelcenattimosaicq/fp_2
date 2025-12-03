@@ -4,7 +4,10 @@ use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 use std::collections::HashSet;
 
-const GAP_SECS: f64 = 15.0;
+// compressors sometimes skip a poll during defrost cycles
+// (the MCU is busy with the valve actuator). 15s covers that gap
+// without breaking the chart line on every defrost.
+const GAP_SECS: f64 = 12.0;
 
 const INTERVALS: &[(&str, i64)] = &[
     ("Live", 60), ("1m", 60), ("5m", 300), ("15m", 900),
@@ -27,9 +30,10 @@ const COLORS: &[egui::Color32] = &[
     egui::Color32::from_rgb(0xe1, 0x1d, 0x48),
 ];
 
-// controller sample rate is ~500ms
-const REFRESH_MS: i64 = 1000;
-const MIN_H: f32 = 150.0;
+// compressor sample rate is ~500ms; 800ms refresh keeps us
+// under 2x without hammering the SQLite file
+const REFRESH_MS: i64 = 800;
+const MIN_H: f32 = 120.0;
 
 #[derive(Debug)]
 pub struct ChartState {
@@ -65,10 +69,11 @@ impl Default for ChartState {
     }
 }
 
-#[allow(clippy::too_many_lines, reason = "chart renderin")]
+#[allow(clippy::too_many_lines, reason = "chart rendering requires sequential layout logic; splitting would hurt readability")]
 pub fn render(ui: &mut egui::Ui, state: &SharedState, db: &HistoryDb, cs: &mut ChartState) {
     let now = chrono::Utc::now().timestamp_millis();
 
+    // refresh the list of chartable registers every 5s
     if now - cs.last_reg_check > 5000 {
         cs.last_reg_check = now;
         let ids = state.read().ok()

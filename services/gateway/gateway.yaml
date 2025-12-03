@@ -1,0 +1,31 @@
+gateway_id: "GW-EDGE-001"
+serial:
+  port: "emulated"
+  baud_rate: 9600
+  slave_id: 254
+mqtt:
+  broker_url: "mqtt://mqtt-broker.iot.local:1883"
+  topic: "controller_app/events"
+  qos: 1
+registry:
+  url: "http://localhost:8088"
+  enrollment_token: "change-me"
+devices_api_url: "https://71waxvgo68.execute-api.us-east-1.amazonaws.com"
+devices_dir: "./devices"
+poll_interval_ms: 5000
+
+vpn:
+  provisioner_url: "https://87dzpnwsh9.execute-api.us-east-1.amazonaws.com"
+  pre_shared_secret: "CHANGE_ME"
+
+worker:
+  image: "nebulastream/nes-executable-image:latest"
+  binary_path: "nesWorker"
+  coordinator_host: "nes-coordinator.iot.local"
+  coordinator_port: 8080
+  local_worker_host: "100.88.85.75"
+  logical_source_name: "telemetry_0x0007"
+  physical_source_name: "edge-0x0007-GW-EDGE-001"
+  mqtt_broker_url: "tcp://mqtt-broker.iot.local:1883"
+  mqtt_topic: "controller_app/events"
+  max_schema_fields: 5
