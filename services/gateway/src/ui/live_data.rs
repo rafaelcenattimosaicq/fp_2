@@ -7,7 +7,7 @@ use std::collections::HashSet;
 // compressors sometimes skip a poll during defrost cycles
 // (the MCU is busy with the valve actuator). 15s covers that gap
 // without breaking the chart line on every defrost.
-const GAP_SECS: f64 = 12.0;
+const GAP_SECS: f64 = 15.0;
 
 const INTERVALS: &[(&str, i64)] = &[
     ("Live", 60), ("1m", 60), ("5m", 300), ("15m", 900),

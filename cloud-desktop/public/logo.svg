@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <defs>
+    <!-- Radial glow emanating from the central hub — the "aura" -->
+    <radialGradient id="aura" cx="300" cy="300" r="260" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#d0d0d0" stop-opacity="0.35"/>
+      <stop offset="40%" stop-color="#b0b0b0" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#999999" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Strong glow filter for the central hub — layered blur for intense aura -->
+    <filter id="hubGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="25" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur3"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur3"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Aura glow background -->
+  <circle cx="300" cy="300" r="260" fill="url(#aura)"/>
+
+  <!-- Connection lines from hub to 6 edge nodes (hexagonal arrangement) -->
+  <line x1="300" y1="300" x2="300" y2="94" stroke="#a0a0a0" stroke-width="5" opacity="0.45"/>
+  <line x1="300" y1="300" x2="478" y2="197" stroke="#a0a0a0" stroke-width="5" opacity="0.45"/>
+  <line x1="300" y1="300" x2="478" y2="403" stroke="#a0a0a0" stroke-width="5" opacity="0.45"/>
+  <line x1="300" y1="300" x2="300" y2="506" stroke="#a0a0a0" stroke-width="5" opacity="0.45"/>
+  <line x1="300" y1="300" x2="122" y2="403" stroke="#a0a0a0" stroke-width="5" opacity="0.45"/>
+  <line x1="300" y1="300" x2="122" y2="197" stroke="#a0a0a0" stroke-width="5" opacity="0.45"/>
+
+  <!-- Outer aura ring around hub -->
+  <circle cx="300" cy="300" r="130" fill="none" stroke="#c0c0c0" stroke-width="2" opacity="0.3"/>
+
+  <!-- Edge nodes — smaller dots at the periphery -->
+  <circle cx="300" cy="94" r="28" fill="#b8b8b8" opacity="0.7"/>
+  <circle cx="478" cy="197" r="28" fill="#b8b8b8" opacity="0.7"/>
+  <circle cx="478" cy="403" r="28" fill="#b8b8b8" opacity="0.7"/>
+  <circle cx="300" cy="506" r="28" fill="#b8b8b8" opacity="0.7"/>
+  <circle cx="122" cy="403" r="28" fill="#b8b8b8" opacity="0.7"/>
+  <circle cx="122" cy="197" r="28" fill="#b8b8b8" opacity="0.7"/>
+
+  <!-- Central hub glow halo — wide soft light -->
+  <circle cx="300" cy="300" r="90" fill="#e0e0e0" opacity="0.15" filter="url(#hubGlow)"/>
+  <!-- Central hub — bright core with glow -->
+  <circle cx="300" cy="300" r="62" fill="#e8e8e8" filter="url(#hubGlow)"/>
+  <!-- Inner ring for depth -->
+  <circle cx="300" cy="300" r="38" fill="none" stroke="#a0a0a0" stroke-width="4" opacity="0.5"/>
+</svg>
