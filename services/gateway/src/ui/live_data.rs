@@ -30,10 +30,11 @@ const COLORS: &[egui::Color32] = &[
     egui::Color32::from_rgb(0xe1, 0x1d, 0x48),
 ];
 
-// compressor sample rate is ~500ms; 800ms refresh keeps us
-// under 2x without hammering the SQLite file
-const REFRESH_MS: i64 = 800;
-const MIN_H: f32 = 120.0;
+// compressor sample rate is ~500ms; 1000ms refresh is a safer
+// default, 800ms was causing occasional lock contention on the
+    // Pi Zero's SD card. Min chart height bumped to match.
+const REFRESH_MS: i64 = 1000;
+const MIN_H: f32 = 150.0;
 
 #[derive(Debug)]
 pub struct ChartState {
