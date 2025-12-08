@@ -15,6 +15,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "aws-amplify": "^6.16.2",
+    "mqtt": "^5.15.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.13.1"
