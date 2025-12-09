@@ -1,5 +1,5 @@
-use crate::state::{ConnectionStatus, NesStatus, SharedState, VpnStatus};
 use crate::modbus::writer::BackgroundCommand;
+use crate::state::{ConnectionStatus, NesStatus, SharedState, VpnStatus};
 use eframe::egui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -16,7 +16,7 @@ pub struct ConnectionState {
     pub transport: ConnectionTransport,
 }
 
-#[allow(clippy::too_many_lines, reason = "connection panel requires sequential layout logic; splitting would hurt readability")]
+#[allow(clippy::too_many_lines, reason = "connection panel")]
 pub fn render(
     ui: &mut egui::Ui,
     state: &SharedState,
@@ -54,10 +54,6 @@ pub fn render(
             });
             ui.add_space(6.0);
 
-            // serial and BLE controls are similar enough that I tried to
-            // unify them into one generic function, but the combo box labels
-            // and scan commands are different enough that it was more confusing
-            // than just having two blocks. maybe revisit if we add USB HID.
             match cs.transport {
                 ConnectionTransport::Serial => {
                     ui.horizontal(|ui| {
