@@ -1,12 +1,3 @@
-// emulated Modbus RTU transport, pretends to be a real device connected over RS-485.
-// used for development on macOS where there's no FTDI adapter plugged in.
-// register 60000 holds the device ID: 0x0007 = AMBIENT-SENSOR, 0x0008 = VEMB compressor.
-// jitter on register reads keeps the chart looking alive during demos, real the client
-// compressor telemetry drifts +-2-3% anyway so nobody notices it's fake.
-//
-// known quirk: the CRC16 here is the standard Modbus polynomial but we had a bug
-// in an earlier version where we forgot to XOR 0xFFFF at init and it took two days
-// to figure out why the CH340 clone was "failing", turned out it was us, not the cable.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io;
@@ -15,7 +6,6 @@ use std::task::{Context, Poll, Waker};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 //, xorshift PRNG -------------------------------------------------------
-// don't want to pull in rand just for jitter on demo values
 struct SimpleRng(u64);
 
 impl SimpleRng {
@@ -29,67 +19,52 @@ impl SimpleRng {
 
     #[allow(clippy::missing_const_for_fn, reason = "&mut self in const fn requires nightly")]
     fn next_u64(&mut self) -> u64 {
-        // lCG, good enough for wobbling chart values
+        // lCG
         self.0 = self.0.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
         self.0
     }
 }
 
-/// cRC-16/MODBUS (poly 0xA001, init 0xFFFF). Byte-at-a-time, slow but we only
-/// run this on 8-byte request frames and short responses so it doesn't matter.
-/// spent a whole afternoon once debugging CRC mismatches against a Waveshare 7"
-/// rPi display gateway that was using big-endian byte order for the CRC, turns
-/// out Modbus wire order is little-endian for the CRC but big-endian for register
-/// data. Fun times.
+/// cRC-16/MODBUS (poly 0xA001, init 0xFFFF). Byte-at-a-time
 fn crc16(data: &[u8]) -> u16 {
-    let mut crc: u16 = 0xFFFF;
-    for &b in data {
-        crc ^= u16::from(b);
+    let mut v: u16 = 0xFFFF;
+    for &x in data {
+        v ^= u16::from(x);
         for _ in 0..8 {
-            if crc & 1 != 0 { crc = (crc >> 1) ^ 0xA001; }
-            else { crc >>= 1; }
+            if v & 1 != 0 { v = (v >> 1) ^ 0xA001; }
+            else { v >>= 1; }
         }
     }
-    crc
+    v
 }
 
-// push CRC onto frame in little-endian wire order
+// push CRC
 fn push_crc(frame: &mut Vec<u8>) {
-    let c = crc16(frame);
+    let r = crc16(frame);
     #[allow(clippy::cast_possible_truncation, reason = "extracting low byte")]
-    frame.push(c as u8);
+    frame.push(r as u8);
     #[allow(clippy::cast_possible_truncation, reason = "extracting high byte")]
-    frame.push((c >> 8) as u8);
+    frame.push((r >> 8) as u8);
 }
 
 fn check_crc(frame: &[u8]) -> bool {
     if frame.len() < 3 { return false; }
-    let payload = &frame[..frame.len() - 2];
-    let expected = crc16(payload);
+    let buf = &frame[..frame.len() - 2];
+    let exp = crc16(buf);
     let got = u16::from(frame[frame.len() - 2]) | (u16::from(frame[frame.len() - 1]) << 8);
-    expected == got
+    exp == got
 }
 
-// dbg!(&frame[..frame.len()-2], expected, got);
-// eprintln!("CRC check: expected=0x{:04X} got=0x{:04X} match={}", expected, got, expected == got);
-// let _hex: String = frame.iter().map(|b| format!("{:02X} ", b)).collect();
-// eprintln!("  frame bytes: {_hex}");
-
-// device ID register, same address the real firmware uses (the client spec v3.2)
 const DEV_ID_ADDR: u16 = 60000;
-// 0x0007 = AMBIENT-SENSOR board from the Joinville pilot
 const DEFAULT_DEV_ID: u16 = 0x0007;
 
-/// fake Modbus RTU slave. Implements `AsyncRead` + `AsyncWrite` so it can be
-/// dropped in wherever a real serial port would go. The jitter on reads makes
-/// the chart in the dashboard look realistic, field techs at the Joinville
-/// pilot actually thought it was a live compressor the first time they saw it.
+/// fake Modbus RTU slave
 pub struct EmulatedTransport {
     inp_regs: HashMap<u16, u16>,
     hold_regs: HashMap<u16, u16>,
     resp_buf: VecDeque<u8>,
     req_buf: Vec<u8>,
-    sid: u8, // slave id, always 1 in our setup but configurable for multi-drop RS-485
+    sid: u8, // slave id
     waker: Option<Waker>,
     rng: SimpleRng,
     written_addrs: HashSet<u16>,  // addresses that were FC06'd, skip jitter on readback
@@ -101,15 +76,12 @@ pub struct EmulatedTransport {
 }
 
 impl EmulatedTransport {
-    /// create a new emulated device. `dev_id` overrides the value at register 60000
-    /// (pass None for the default AMBIENT-SENSOR 0x0007).
     pub fn new(slave_id: u8, dev_id: Option<u16>) -> Self {
         let mut hold = HashMap::new();
         hold.insert(DEV_ID_ADDR, dev_id.unwrap_or(DEFAULT_DEV_ID));
 
         use crate::firmware::types;
-        // firmware OTA registers, seed with sane defaults so reads before
-        // any OTA flow don't return garbage
+        // firmware OTA registers
         hold.insert(types::REG_FIRMWARE_VERSION, 0x0100);
         hold.insert(types::REG_OTA_CONTROL, types::OTA_STATUS_IDLE);
 
@@ -133,9 +105,7 @@ impl EmulatedTransport {
         }
     }
 
-    /// populate input/holding registers from a device descriptor so the emulated
-    /// device returns plausible values. Called once after we fetch the descriptor
-    /// from the cloud API (or local fallback).
+    /// populate input/holding registers
     #[cfg(test)]
     pub fn seed_registers(
         &mut self,
@@ -156,8 +126,7 @@ impl EmulatedTransport {
         }
     }
 
-    // wobble value so the chart doesn't flatline. real compressor readings drift
-    // anyway from thermal noise in the ADC on the the client board.
+    // wobble value so the chart doesn't flatline
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -166,7 +135,6 @@ impl EmulatedTransport {
     )]
     fn jitter(&mut self, base: u16) -> u16 {
         if base == 0 {
-            // zero-centered: pick a small random offset
             let raw = self.rng.next_u64();
             let norm = (raw as f64 / u64::MAX as f64).mul_add(2.0, -1.0);
             let off = (norm * 3.0).round() as i32;
@@ -186,29 +154,27 @@ impl EmulatedTransport {
         if frame.len() < 6 { return; }
         if !check_crc(frame) { return; } // cRC errors happen a lot on long RS-485 runs (>15m)
 
-        let slave = frame[0];
-        let fc = frame[1];
-        if slave != self.sid { return; }  // not for us
+        let s = frame[0];
+        let f = frame[1];
+        if s != self.sid { return; }  // not for us
 
-        // dispatch, only support the three FCs the gateway actually uses
-        let resp = match fc {
+        let data = match f {
             0x03 => self.fc03_read_holding(frame),
             0x04 => self.fc04_read_input(frame),
             0x06 => self.fc06_write_single(frame),
             _ => {
                 // exception response: illegal function
-                let mut r = vec![slave, fc | 0x80, 0x01];
+                let mut r = vec![s, f | 0x80, 0x01];
                 push_crc(&mut r);
                 r
             }
         };
 
-        self.resp_buf.extend(resp);
+        self.resp_buf.extend(data);
         if let Some(w) = self.waker.take() { w.wake(); }
     }
 
-    // fC 03, Read Holding Registers
-    // used for device ID, firmware version, setpoints, OTA status
+    // fC 03
     fn fc03_read_holding(&mut self, frame: &[u8]) -> Vec<u8> {
         let start = u16::from(frame[2]) << 8 | u16::from(frame[3]);
         let cnt = u16::from(frame[4]) << 8 | u16::from(frame[5]);
@@ -220,8 +186,7 @@ impl EmulatedTransport {
         for i in 0..cnt {
             let a = start + i;
             let base_val = self.hold_regs.get(&a).copied().unwrap_or(0);
-            // don't jitter values the master wrote, if we wrote a setpoint of 42
-            // we should read back 42, not 43
+
             let v = if self.written_addrs.contains(&a) { base_val } else { self.jitter(base_val) };
             r.push((v >> 8) as u8);
             #[allow(clippy::cast_possible_truncation, reason = "low byte extraction")]
@@ -232,7 +197,7 @@ impl EmulatedTransport {
     }
 
     // fC 04, Read Input Registers
-    // telemetry: suction/discharge temps, compressor RPM, power, etc
+    // telemetry: suction/discharge temps,
     fn fc04_read_input(&mut self, frame: &[u8]) -> Vec<u8> {
         let start = u16::from(frame[2]) << 8 | u16::from(frame[3]);
         let cnt = u16::from(frame[4]) << 8 | u16::from(frame[5]);
@@ -254,14 +219,11 @@ impl EmulatedTransport {
     }
 
     // fC 06, Write Single Register
-    // this one got complicated once OTA was added, the control register at 60100
-    // drives a whole state machine (START -> data chunks -> COMMIT/ABORT)
     fn fc06_write_single(&mut self, frame: &[u8]) -> Vec<u8> {
         use crate::firmware::types;
         let addr = u16::from(frame[2]) << 8 | u16::from(frame[3]);
         let val = u16::from(frame[4]) << 8 | u16::from(frame[5]);
 
-        // oTA control register has special handling
         if addr == types::REG_OTA_CONTROL {
             self.written_addrs.insert(addr);
             match val {
@@ -269,15 +231,9 @@ impl EmulatedTransport {
                     self.ota_active = true;
                     self.ota_fw.clear();
                     self.hold_regs.insert(addr, types::OTA_STATUS_RECEIVING);
-                    tracing::info!("Emulated OTA: START received");
                 }
                 types::OTA_CMD_COMMIT => {
                     self.hold_regs.insert(addr, types::OTA_STATUS_VALIDATING);
-                    tracing::info!(
-                        size = self.ota_fw.len(),
-                        expected = self.ota_sz,
-                        "Emulated OTA: COMMIT received, validating"
-                    );
 
                     let actual_crc = types::crc32(&self.ota_fw);
                     // FIXME: should we add a small delay here to simulate flash erase time?
@@ -289,14 +245,8 @@ impl EmulatedTransport {
                         self.hold_regs.insert(types::REG_FIRMWARE_VERSION, nv);
                         self.written_addrs.insert(types::REG_FIRMWARE_VERSION);
                         self.hold_regs.insert(addr, types::OTA_STATUS_SUCCESS);
-                        tracing::info!(new_version = format!("0x{nv:04X}"), "Emulated OTA: flash successful");
                     } else {
                         self.hold_regs.insert(addr, types::OTA_STATUS_ERROR);
-                        tracing::warn!(
-                            actual_crc, expected_crc = self.ota_crc,
-                            actual_size = self.ota_fw.len(), expected_size = self.ota_sz,
-                            "Emulated OTA: CRC or size mismatch"
-                        );
                     }
                     self.ota_active = false;
                 }
@@ -305,7 +255,6 @@ impl EmulatedTransport {
                     self.ota_active = false;
                     self.ota_fw.clear();
                     self.hold_regs.insert(addr, types::OTA_STATUS_IDLE);
-                    tracing::info!("Emulated OTA: ABORT received");
                 }
                 _ if val >= 0x10 && self.ota_active => {
                     // chunk sequence number, just ack it
@@ -328,24 +277,19 @@ impl EmulatedTransport {
             self.ota_crc = (self.ota_crc & 0xFFFF_0000) | u32::from(val);
             self.hold_regs.insert(addr, val);  self.written_addrs.insert(addr);
         } else if (types::REG_DATA_WINDOW_START..=types::REG_DATA_WINDOW_END).contains(&addr) && self.ota_active {
-            // firmware data chunk, accumulate into ota_fw buffer
             self.ota_fw.extend_from_slice(&val.to_be_bytes());
             self.hold_regs.insert(addr, val);
             self.written_addrs.insert(addr);
         } else {
-            // generic holding register write, setpoints, thresholds etc
             self.hold_regs.insert(addr, val);
             self.written_addrs.insert(addr);
         }
 
-        // fC06 echo: slave + fc + addr_hi + addr_lo + val_hi + val_lo + crc
         let mut resp = vec![self.sid, 0x06, frame[2], frame[3], frame[4], frame[5]];
         push_crc(&mut resp);
         resp
     }
 
-    // all standard modbus RTU requests are exactly 8 bytes (slave + fc + 4 data + 2 crc)
-    // NOTE: FC16 (write multiple) would be variable length but we don't support it
     const fn expected_req_len() -> usize { 8 }
 }
 
@@ -362,7 +306,7 @@ impl std::fmt::Debug for EmulatedTransport {
 }
 
 // asyncRead, the "serial port" read side. Returns response bytes that were
-// queued up by process_frame(). If nothing is ready, park the waker.
+// queued up by process_frame() 
 impl AsyncRead for EmulatedTransport {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -374,7 +318,7 @@ impl AsyncRead for EmulatedTransport {
             this.waker = Some(cx.waker().clone());
             return Poll::Pending;
         }
-        // drain as many bytes as the caller's buffer can hold
+        // drain 
         let n = this.resp_buf.len().min(buf.remaining());
         for _ in 0..n {
             if let Some(b) = this.resp_buf.pop_front() {
@@ -385,8 +329,7 @@ impl AsyncRead for EmulatedTransport {
     }
 }
 
-// asyncWrite, the "serial port" write side. Accumulates bytes until we
-// have a complete 8-byte request frame, then processes it.
+// asyncWrite, the "serial port" write side
 impl AsyncWrite for EmulatedTransport {
     fn poll_write(
         self: Pin<&mut Self>,
@@ -464,7 +407,7 @@ mod tests {
         f
     }
 
-    // pull the first register value out of a FC03/FC04 response
+    // pull the first reg
     fn drain_resp_reg(t: &mut EmulatedTransport) -> u16 {
         let resp: Vec<u8> = t.resp_buf.drain(..).collect();
         assert!(resp.len() >= 7, "response too short: {} bytes", resp.len());
@@ -474,7 +417,7 @@ mod tests {
 
     #[test]
     fn crc16_known_vector() {
-        // verified against online Modbus CRC calculator
+        // verified 
         let data = [0x01, 0x03, 0x00, 0x00, 0x00, 0x01];
         assert_eq!(crc16(&data), 0x0A84, "CRC should match known test vector");
     }
@@ -501,7 +444,7 @@ mod tests {
 
     #[test]
     fn seed_registers_populates_both_maps() {
-        // tEMP at input reg 100, scaled by 10x. default 25.0 -> raw 250
+        // tEMP at input reg 100
         let status = vec![mk_reg("TEMP", 100, Some(25.0), Some(10.0))];
         let params = vec![mk_reg("SETPOINT", 200, Some(5.0), Some(10.0))];
 
@@ -528,7 +471,6 @@ mod tests {
         assert_eq!(resp[1], 0x03); // fc
         assert_eq!(resp[2], 0x02); // byte count
         let actual = u16::from(resp[3]) << 8 | u16::from(resp[4]);
-        // jitter is +-5% so allow 6% tolerance to avoid flaky tests
         let tol = f64::from(base) * 0.06;
         assert!((f64::from(actual) - f64::from(base)).abs() <= tol);
         assert!(check_crc(&resp));
@@ -565,10 +507,9 @@ mod tests {
         push_crc(&mut req);
         t.process_frame(&req);
 
-        // value should be stored
         assert_eq!(t.hold_regs.get(&5), Some(&0x00FF));
 
-        // echo should be identical to request (minus our CRC)
+        // echo identical
         let resp: Vec<u8> = t.resp_buf.drain(..).collect();
         assert_eq!(resp[0], 0x01);
         assert_eq!(resp[1], 0x06);
@@ -595,8 +536,6 @@ mod tests {
 
     #[test]
     fn bad_crc_silently_dropped() {
-        // on a real bus this happens when someone plugs in a cheap USB-serial
-        // adapter with no ground reference, we just ignore it
         let mut t = EmulatedTransport::new(1, None);
         let req = vec![0x01, 0x03, 0x00, 0x00, 0x00, 0x01, 0xFF, 0xFF];
         t.process_frame(&req);
@@ -626,7 +565,6 @@ mod tests {
     }
 
     //, OTA flow tests ---------------------------------------------------
-    // these mirror what the real ota.rs does against actual hardware
 
     #[test]
     fn ota_full_happy_path() {

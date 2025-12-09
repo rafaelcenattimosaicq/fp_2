@@ -1,0 +1,33 @@
+[package]
+name = "registry"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["sqlite"]
+sqlite = []
+dynamodb = ["dep:aws-config", "dep:aws-sdk-dynamodb", "dep:aws-types"]
+athena = ["dep:aws-config", "dep:aws-sdk-athena", "dep:aws-types"]
+
+[dependencies]
+async-trait = "0.1"
+axum = { version = "0.7", features = ["json"] }
+chrono = { version = "0.4", features = ["serde"] }
+getrandom = "0.2"
+rumqttc = { version = "0.24", features = ["use-rustls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time", "net", "sync"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+aws-config = { version = "1", optional = true }
+aws-sdk-athena = { version = "1", optional = true }
+aws-sdk-dynamodb = { version = "1", optional = true }
+aws-types = { version = "1", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
