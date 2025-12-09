@@ -17,12 +17,12 @@ pub struct VpnEndpoints {
     pub mqtt_broker_port: u16,
 }
 
+#[allow(unused)]
+const STALE_AUTH_KEY_SECS: u64 = 21000;
+
 const POLL_INTERVAL: Duration = Duration::from_secs(5);
 
-// 6h * 3600 / 5s = 4320 polls before the tailscale auth key expires.
-// the free-tier API won't let you request keys longer than 6h,
-// and we've seen the key actually die at ~5h50m on one occasion,
-// but 4320 is close enough.
+// 6h * 3600 / 5s = 4320 polls 
 const MAX_POLLS: u32 = 4320;
 
 pub async fn connect_vpn(
@@ -32,17 +32,16 @@ pub async fn connect_vpn(
 ) -> Result<VpnEndpoints, Box<dyn std::error::Error + Send + Sync>> {
     set_status(state, VpnStatus::Checking);
 
-    let ts = tailscale::check_status();
+    let s = tailscale::check_status();
 
-    if let tailscale::TailscaleState::Connected(ref ip) = ts {
-        tracing::info!(%ip, "tailscale already connected, skipping install");
+    if let tailscale::TailscaleState::Connected(ref v) = s {
         set_status(state, VpnStatus::Provisioning);
-        let pr = do_provision(cfg, gw_id, state).await?;
-        set_status(state, VpnStatus::Connected(ip.clone()));
-        return Ok(endpoints_from(ip.clone(), &pr));
+        let r = do_provision(cfg, gw_id, state).await?;
+        set_status(state, VpnStatus::Connected(v.clone()));
+        return Ok(endpoints_from(v.clone(), &r));
     }
 
-    if ts == tailscale::TailscaleState::NotInstalled {
+    if s == tailscale::TailscaleState::NotInstalled {
         set_status(state, VpnStatus::Installing);
         push(state, "installing tailscale...");
         tailscale::install().inspect_err(|e| {
@@ -51,18 +50,18 @@ pub async fn connect_vpn(
     }
 
     set_status(state, VpnStatus::Provisioning);
-    let pr = do_provision(cfg, gw_id, state).await?;
+    let r = do_provision(cfg, gw_id, state).await?;
 
     set_status(state, VpnStatus::Connecting);
     push(state, "connecting to tailscale...");
-    let ip = tailscale::connect(&pr.auth_key, gw_id).inspect_err(|e| {
+    let x = tailscale::connect(&r.auth_key, gw_id).inspect_err(|e| {
         set_status(state, VpnStatus::Error(e.to_string()));
     })?;
 
-    set_status(state, VpnStatus::Connected(ip.clone()));
-    push(state, &format!("VPN up: {ip} on {}", pr.tailnet));
+    set_status(state, VpnStatus::Connected(x.clone()));
+    push(state, &format!("VPN up: {x} on {}", r.tailnet));
 
-    Ok(endpoints_from(ip, &pr))
+    Ok(endpoints_from(x, &r))
 }
 
 fn endpoints_from(ip: String, pr: &provisioner::ProvisionResponse) -> VpnEndpoints {
@@ -81,48 +80,46 @@ async fn do_provision(
     gw_id: &str,
     state: &SharedState,
 ) -> Result<provisioner::ProvisionResponse, Box<dyn std::error::Error + Send + Sync>> {
-    let fp = fingerprint::HardwareFingerprint::collect();
-    tracing::info!(mac = %fp.mac_address, cpu = %fp.cpu_id, "fingerprint collected");
+    let data = fingerprint::HardwareFingerprint::collect();
 
     // the setup tab lets field techs paste a secret at runtime,
     // which ends up in shared state. if they haven't pasted one yet
     // we fall back to whatever's in gateway.yaml (if anything).
-    let secret = state.read().ok()
+    let sec = state.read().ok()
         .map(|s| s.vpn_secret.clone())
         .filter(|s| !s.is_empty() && s != "${GATEWAY_SECRET}")
         .or_else(|| cfg.pre_shared_secret.clone());
 
     push(state, "submitting VPN request...");
-    let token = provisioner::submit_vpn_request(
-        &cfg.provisioner_url, gw_id, secret.as_deref(), &fp,
+    let tok = provisioner::submit_vpn_request(
+        &cfg.provisioner_url, gw_id, sec.as_deref(), &data,
     ).await?;
 
     push(state, "waiting for admin approval in Cloud Desktop...");
 
-    let mut n = 0u32;
+    let mut i = 0u32;
     loop {
         tokio::time::sleep(POLL_INTERVAL).await;
-        n += 1;
-        if n > MAX_POLLS {
-            let msg = "timed out waiting for VPN approval (auth key likely expired)";
-            set_status(state, VpnStatus::Error(msg.into()));
-            return Err(msg.into());
+        i += 1;
+        if i > MAX_POLLS {
+            let tmp = "timed out waiting for VPN approval (auth key likely expired)";
+            set_status(state, VpnStatus::Error(tmp.into()));
+            return Err(tmp.into());
         }
 
-        match provisioner::poll_vpn_status(&cfg.provisioner_url, &token).await {
-            Ok(provisioner::PollResult::Approved(pr)) => return Ok(pr),
+        match provisioner::poll_vpn_status(&cfg.provisioner_url, &tok).await {
+            Ok(provisioner::PollResult::Approved(x)) => return Ok(x),
             Ok(provisioner::PollResult::Pending) => {}
             Ok(provisioner::PollResult::Denied) => {
                 set_status(state, VpnStatus::Error("request denied".into()));
                 return Err("VPN request denied by admin".into());
             }
-            // network blip, lambda timeout, etc. just try again.
-            Err(e) => tracing::warn!(%e, "poll failed, retrying"),
+            Err(_e) => {}
         }
     }
 }
 
-// ---- tiny helpers to cut down on the state.write().unwrap() noise ----
+// ---this is to remove the state.write().unwrap() noise ------------
 
 fn set_status(state: &SharedState, s: VpnStatus) {
     state.write().expect("vpn lock").vpn_status = s;

@@ -1,5 +1,5 @@
-use crate::modbus::writer::BackgroundCommand;
 use crate::state::{ConnectionStatus, NesStatus, SharedState, VpnStatus};
+use crate::modbus::writer::BackgroundCommand;
 use eframe::egui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
