@@ -1,0 +1,15 @@
+[package]
+name = "mqtt-broker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rumqttd = { version = "0.19", features = ["use-rustls", "verify-client-cert"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+rumqttc = { version = "0.24", features = ["use-rustls"] }
+rcgen = { version = "0.13", features = ["pem"] }
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }

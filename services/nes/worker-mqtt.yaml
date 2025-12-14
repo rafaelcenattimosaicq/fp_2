@@ -1,0 +1,18 @@
+logLevel: LOG_INFO
+coordinatorHost: nes-coordinator
+localWorkerHost: nes-worker-mqtt
+coordinatorPort: 8080
+physicalSources:
+  - logicalSourceName: telemetry
+    physicalSourceName: edge-mqtt-worker
+    type: MQTT_SOURCE
+    configuration:
+      url: "tcp://mosquitto-test:1883"
+      topic: "telemetry/nes"
+      clientId: "nes-edge-worker"
+      userName: "nes"
+      qos: 1
+      cleanSession: true
+      inputFormat: CSV
+      flushIntervalMS: 1000
+      numberOfBuffersToProduce: 0

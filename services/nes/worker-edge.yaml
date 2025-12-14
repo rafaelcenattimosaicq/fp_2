@@ -1,0 +1,20 @@
+logLevel: LOG_INFO
+coordinatorHost: 10.0.11.238
+localWorkerHost: 0.0.0.0
+coordinatorPort: 8080
+dataPort: 5100
+rpcPort: 5101
+physicalSources:
+  - logicalSourceName: telemetry
+    physicalSourceName: edge-mqtt-worker
+    type: MQTT_SOURCE
+    configuration:
+      url: "tcp://host.docker.internal:1883"
+      topic: "telemetry/nes"
+      clientId: "nes-edge-worker"
+      userName: "nes"
+      qos: 1
+      cleanSession: true
+      inputFormat: CSV
+      flushIntervalMS: 1000
+      numberOfBuffersToProduce: 0

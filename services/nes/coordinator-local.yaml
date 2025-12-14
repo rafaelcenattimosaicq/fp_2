@@ -1,0 +1,18 @@
+logLevel: LOG_INFO
+coordinatorHost: nes-coordinator
+restIp: 0.0.0.0
+restPort: 8081
+rpcPort: 8080
+worker:
+  localWorkerHost: nes-coordinator
+logicalSources:
+  - logicalSourceName: "telemetry"
+    fields:
+      - name: "DEVICE_ID"
+        type: TEXT
+      - name: "GATEWAY_ID"
+        type: TEXT
+      - name: "timestamp"
+        type: UINT64
+optimizer:
+  queryMergerRule: "DefaultQueryMergerRule"

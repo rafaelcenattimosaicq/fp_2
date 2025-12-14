@@ -1,0 +1,86 @@
+services:
+  mqtt-broker:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo 'listener 1883 0.0.0.0' > /mosquitto/config/mosquitto.conf
+        echo 'allow_anonymous true' >> /mosquitto/config/mosquitto.conf
+        echo 'log_dest stdout' >> /mosquitto/config/mosquitto.conf
+        mosquitto -c /mosquitto/config/mosquitto.conf
+
+  registry:
+    build:
+      context: ./registry
+    depends_on:
+      - mqtt-broker
+    ports:
+      - "8088:8088"
+    environment:
+      REGISTRY_BIND_ADDR: "0.0.0.0"
+      REGISTRY_PORT: "8088"
+      REGISTRY_BACKEND: "sqlite"
+      REGISTRY_SQLITE_PATH: "/data/registry.db"
+      REGISTRY_MQTT_ENABLED: "true"
+      MQTT_HOST: "mqtt-broker"
+      MQTT_PORT: "1883"
+    volumes:
+      - ./registry/data:/data
+
+  mqtt-to-tcp-bridge:
+    build:
+      context: ./rules-engine
+    depends_on:
+      - mqtt-broker
+    ports:
+      - "50501:50501"
+    command: ["mqtt_to_tcp_bridge"]
+    environment:
+      MQTT_HOST: mqtt-broker
+      MQTT_PORT: "1883"
+      MQTT_TOPIC_FILTER: "controller_app/events"
+      TCP_BIND_ADDR: "0.0.0.0"
+      TCP_PORT: "50501"
+
+  rules-engine:
+    build:
+      context: ./rules-engine
+    depends_on:
+      - mqtt-broker
+    environment:
+      MQTT_HOST: mqtt-broker
+      MQTT_PORT: "1883"
+      POLICY_TOPIC_FILTER: "policies/#"
+      TELEMETRY_TOPIC_FILTER: "telemetry/#"
+
+  nes-coordinator:
+    image: nebulastream/nes-executable-image:latest
+    depends_on:
+      - mqtt-broker
+    ports:
+      - "8081:8081"
+      - "8080:8080"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["nesCoordinator --configPath=/config/coordinator-local.yaml"]
+    volumes:
+      - ./nes:/config:ro
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  nes-worker:
+    image: nebulastream/nes-executable-image:latest
+    depends_on:
+      nes-coordinator:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["nesWorker --configPath=/config/worker-local.yaml"]
+    volumes:
+      - ./nes:/config:ro
