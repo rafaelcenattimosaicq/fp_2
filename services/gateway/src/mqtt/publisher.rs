@@ -3,8 +3,8 @@ use crate::state::{ConnectionStatus, SharedState};
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use std::time::Duration;
 pub fn parse_broker_url(url: &str) -> (String, u16) {
-    let s=url.strip_prefix("mqtt://").or_else(||url.strip_prefix("tcp://")).unwrap_or(url);
-    if let Some((h,p))=s.rsplit_once(':'){(h.into(),p.parse().unwrap_or(1883))}else{(s.into(),1883)}
+    let s = url.strip_prefix("mqtt://").or_else(|| url.strip_prefix("tcp://")).unwrap_or(url);
+    if let Some((h, p)) = s.rsplit_once(':') { (h.into(), p.parse().unwrap_or(1883)) } else { (s.into(), 1883) }
 }
 pub fn run_mqtt_loop(config: &MqttConfig, state: SharedState) -> AsyncClient {
     let (host,port)=parse_broker_url(&config.broker_url);

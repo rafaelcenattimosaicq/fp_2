@@ -33,6 +33,17 @@ fn map_reg_type(rt: Option<&str>) -> Option<&'static str> {
     }
 }
 
+// helper to dump a schema to stderr for field-debugging sessions.
+// called from the worker_manager when RUST_LOG=debug is set.
+#[allow(dead_code)]
+fn dump_schema_fields(schema: &NesSchema) {
+    for (i, f) in schema.fields.iter().enumerate() {
+        eprintln!("  [{i}] {} : {}", f.name, f.nes_type);
+    }
+    eprintln!("  total fields: {}", schema.fields.len());
+    eprintln!("  logical source: {}", schema.logical_source_name);
+}
+
 fn extract_device_type_id(desc: &DeviceDescriptor) -> String {
     desc.device_description.as_ref()
         .and_then(|dd| dd.device_id.as_deref())
