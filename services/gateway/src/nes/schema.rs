@@ -15,12 +15,7 @@ pub struct NesSchema {
     pub fields: Vec<NesField>,
 }
 
-// maps the client descriptor register types to NES Nautilus types.
-// "enum" and "bitwise" don't map to anything useful in NES, enums are strings
-// and bitwise is a bitmask. We skip them entirely in the schema.
-// "integer" maps to FLOAT64 (not INT64) because the client uses signed integers
-// for things like temperature that can go negative, and the Modbus registers
-// encode them as 16-bit signed values that we decode as f64 anyway.
+// maps the client descriptor register types to NES Nautilus typesxs
 #[allow(clippy::match_same_arms)]
 fn map_reg_type(rt: Option<&str>) -> Option<&'static str> {
     match rt {
@@ -33,29 +28,16 @@ fn map_reg_type(rt: Option<&str>) -> Option<&'static str> {
     }
 }
 
-// helper to dump a schema to stderr for field-debugging sessions.
-// called from the worker_manager when RUST_LOG=debug is set.
-#[allow(dead_code)]
-fn dump_schema_fields(schema: &NesSchema) {
-    for (i, f) in schema.fields.iter().enumerate() {
-        eprintln!("  [{i}] {} : {}", f.name, f.nes_type);
-    }
-    eprintln!("  total fields: {}", schema.fields.len());
-    eprintln!("  logical source: {}", schema.logical_source_name);
-}
-
 fn extract_device_type_id(desc: &DeviceDescriptor) -> String {
     desc.device_description.as_ref()
-        .and_then(|dd| dd.device_id.as_deref())
+        .and_then(|d| d.device_id.as_deref())
         .map_or_else(
             || "unknown".to_string(),
-            |id| id.to_lowercase().replace('\'', ""),
+            |v| v.to_lowercase().replace('\'', ""),
         )
 }
 
 // pull the register IDs from the graph_data section of SERVICE_DATA_ACQUISITION.
-// these are the registers that the the client desktop app shows in the real-time
-// chart, so they're the most important ones to include in the NES schema.
 fn graph_data_ids(desc: &DeviceDescriptor) -> Vec<String> {
     for svc in &desc.services {
         let is_da = svc.id.as_deref()
@@ -78,50 +60,50 @@ fn graph_data_ids(desc: &DeviceDescriptor) -> Vec<String> {
 /// mLIR compiler hangs with 100+ fields, 20 is a safe limit found by
 /// trial and error on the coordinator running on Fargate (2 vCPU / 4GB).
 pub fn build_schema(desc: &DeviceDescriptor, max_reg_fields: usize) -> NesSchema {
-    let dev_id = extract_device_type_id(desc);
-    let ls_name = format!("telemetry_{dev_id}");
+    let did = extract_device_type_id(desc);
+    let n = format!("telemetry_{did}");
 
     // fixed fields always present
-    let mut fields = vec![
+    let mut flds = vec![
         NesField { name: "DEVICE_ID".to_string(), nes_type: "UINT64".to_string() },
         NesField { name: "GATEWAY_ID".to_string(), nes_type: "UINT64".to_string() },
         NesField { name: "timestamp".to_string(), nes_type: "UINT64".to_string() },
     ];
 
     // index status registers by ID for O(1) lookup
-    let mut status_by_id: std::collections::HashMap<&str, &crate::device_descriptor::Register> =
+    let mut idx: std::collections::HashMap<&str, &crate::device_descriptor::Register> =
         std::collections::HashMap::new();
-    if let Some(chars) = &desc.characteristics {
-        for reg in &chars.status {
-            status_by_id.entry(reg.id.as_str()).or_insert(reg);
+    if let Some(ch) = &desc.characteristics {
+        for r in &ch.status {
+            idx.entry(r.id.as_str()).or_insert(r);
         }
     }
 
-    let mut seen: HashSet<String> = HashSet::new();
-    let mut reg_count = 0;
+    let mut s: HashSet<String> = HashSet::new();
+    let mut cnt = 0;
 
     // closure to try adding a register field, respecting the cap and dedup
     let mut try_add = |rid: &str| {
-        if reg_count >= max_reg_fields { return; }
-        if !seen.insert(rid.to_string()) { return; } // already added
-        if let Some(reg) = status_by_id.get(rid) {
-            if let Some(nes_t) = map_reg_type(reg.register_type.as_deref()) {
-                fields.push(NesField { name: reg.id.clone(), nes_type: nes_t.to_string() });
-                reg_count += 1;
+        if cnt >= max_reg_fields { return; }
+        if !s.insert(rid.to_string()) { return; } // already added
+        if let Some(r) = idx.get(rid) {
+            if let Some(t) = map_reg_type(r.register_type.as_deref()) {
+                flds.push(NesField { name: r.id.clone(), nes_type: t.to_string() });
+                cnt += 1;
             }
         }
     };
 
     // graph_data registers get priority, these are what the user sees in the chart
-    let prio = graph_data_ids(desc);
-    for id in &prio { try_add(id); }
+    let tmp = graph_data_ids(desc);
+    for id in &tmp { try_add(id); }
 
     // fill remaining slots with other status registers
-    if let Some(chars) = &desc.characteristics {
-        for reg in &chars.status { try_add(&reg.id); }
+    if let Some(ch) = &desc.characteristics {
+        for r in &ch.status { try_add(&r.id); }
     }
 
-    NesSchema { logical_source_name: ls_name, fields }
+    NesSchema { logical_source_name: n, fields: flds }
 }
 
 // maps our internal NES type names to the DSL syntax the coordinator expects.
@@ -141,12 +123,12 @@ fn nes_type_to_dsl(t: &str) -> &'static str {
 /// generate the Schema DSL string for the coordinator REST API.
 /// output looks like: `Schema::create()->addField(createField("foo", BasicType::UINT64))->...;`
 pub fn generate_schema_dsl(schema: &NesSchema) -> String {
-    let mut dsl = String::from("Schema::create()");
+    let mut buf = String::from("Schema::create()");
     for f in &schema.fields {
-        let _ = write!(dsl, "->addField(createField(\"{}\", {}))", f.name, nes_type_to_dsl(&f.nes_type));
+        let _ = write!(buf, "->addField(createField(\"{}\", {}))", f.name, nes_type_to_dsl(&f.nes_type));
     }
-    dsl.push(';');
-    dsl
+    buf.push(';');
+    buf
 }
 
 #[cfg(test)]

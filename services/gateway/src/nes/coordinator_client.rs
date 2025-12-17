@@ -2,10 +2,11 @@ use crate::nes::schema::{generate_schema_dsl, NesSchema};
 use std::sync::OnceLock;
 use std::time::Duration;
 
-// the coordinator runs on ECS Fargate behind a Tailscale VPN address, so its
-// iP changes every time the ECS task restarts. All URLs come from VPN discovery
-// or the gateway config, never hardcoded.
+// the coordinator runs on ECS Fargate 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+// TODO: handle the case where coordinator is behind a load balancer
+// and the health check endpoint returns 200 but queries still fail
+const _LB_GRACE_PERIOD: Duration = Duration::from_secs(5);
 
 static HTTP: OnceLock<reqwest::Client> = OnceLock::new();
 
@@ -14,7 +15,6 @@ fn http() -> &'static reqwest::Client {
         reqwest::Client::builder()
             .timeout(DEFAULT_TIMEOUT)
             .build()
-            .expect("failed to build HTTP client -- TLS backend unavailable?")
     })
 }
 
@@ -23,77 +23,62 @@ pub enum CoordinatorError {
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
 
-    #[error("Coordinator returned {status}: {body}")]
+    #[error("coordinator returned {status}: {body}")]
     ApiError { status: u16, body: String },
 }
 
-/// register a logical source (schema) with the coordinator. Returns true if
-/// newly added, false if it already existed (in which case we try to update it).
 pub async fn register_logical_source(
     coord_url: &str,
     schema: &NesSchema,
 ) -> Result<bool, CoordinatorError> {
-    let dsl = generate_schema_dsl(schema);
-    let url = format!("{}/v1/nes/sourceCatalog/addLogicalSource",
+    let d = generate_schema_dsl(schema);
+    let u = format!("{}/v1/nes/sourceCatalog/addLogicalSource",
         coord_url.trim_end_matches('/'));
 
-    let body = serde_json::json!({
+    let b = serde_json::json!({
         "logicalSourceName": schema.logical_source_name,
-        "schema": dsl,
+        "schema": d,
     });
 
-    let resp = http().post(&url).json(&body).send().await?;
-    let st = resp.status();
-    let resp_body = resp.text().await?;
+    let r = http().post(&u).json(&b).send().await?;
+    let s = r.status();
+    let txt = r.text().await?;
 
-    if st.is_success() {
-        tracing::info!(logical_source = %schema.logical_source_name,
-            "Logical source registered successfully");
+    if s.is_success() {
         Ok(true)
-    } else if st.as_u16() == 400 && resp_body.contains("already exists") {
+    } else if s.as_u16() == 400 && txt.contains("already exists") {
         // schema already registered, try to update it in case fields changed
-        tracing::info!(logical_source = %schema.logical_source_name,
-            "Logical source already exists, attempting schema update");
         let _ = update_logical_source(coord_url, schema).await;
         Ok(false)
     } else {
-        Err(CoordinatorError::ApiError { status: st.as_u16(), body: resp_body })
+        Err(CoordinatorError::ApiError { status: s.as_u16(), body: txt })
     }
 }
 
-/// retry wrapper for `register_logical_source`. The coordinator can take 30+
-/// seconds to come up on ECS Fargate cold starts, so we retry with exponential
-/// backoff up to `max_attempts`.
+/// retry wrapper for `register_logical_source`
 pub async fn register_logical_source_with_retry(
     coord_url: &str,
     schema: &NesSchema,
     max_attempts: u32,
 ) -> Result<bool, CoordinatorError> {
-    let mut backoff = Duration::from_secs(1);
+    let mut bo = Duration::from_secs(1);
 
-    for attempt in 1..=max_attempts {
+    for i in 1..=max_attempts {
         match register_logical_source(coord_url, schema).await {
-            Ok(added) => return Ok(added),
+            Ok(v) => return Ok(v),
             Err(e) => {
-                if attempt == max_attempts {
-                    tracing::error!(attempt, max_attempts, error = %e,
-                        "could not register logical source");
+                if i == max_attempts {
                     return Err(e);
                 }
-                tracing::warn!(attempt, max_attempts, error = %e,
-                    backoff_secs = backoff.as_secs(),
-                    "Coordinator not ready, retrying...");
-                tokio::time::sleep(backoff).await;
-                backoff = (backoff * 2).min(Duration::from_secs(30));
+                tokio::time::sleep(bo).await;
+                bo = (bo * 2).min(Duration::from_secs(30));
             }
         }
     }
     unreachable!()
 }
 
-// two different topology formats because the NES REST API isn't consistent --
-// sometimes it returns a flat list of nodes, sometimes a tree. Node ID 1 is
-// always the coordinator itself, so we skip it when looking for workers.
+// two different topology formats
 #[cfg(test)]
 fn find_worker_in_flat_topology(topo: &serde_json::Value) -> Option<u32> {
     let nodes = topo.get("nodes")?.as_array()?;
@@ -211,11 +196,6 @@ pub async fn find_stale_physical_sources(
                     .and_then(serde_json::Value::as_str).unwrap_or("").to_string();
                 let ls = src.get("logicalSourceName")
                     .and_then(serde_json::Value::as_str).unwrap_or(ls_name).to_string();
-                tracing::warn!(
-                    logical_source = ls_name, physical_source = %ps_name,
-                    stale_node_id = nid,
-                    "Detected stale physical source on non-existent topology node"
-                );
                 stale.push(StalePhysicalSource {
                     physical_source_name: ps_name,
                     logical_source_name: ls,
@@ -245,10 +225,7 @@ pub async fn remove_physical_source(
     if st.is_success() {
         Ok(true)
     } else {
-        let body = resp.text().await?;
-        tracing::warn!(physical_source = %stale.physical_source_name,
-            status = st.as_u16(), body = %body,
-            "could not remove physical source");
+        let _body = resp.text().await?;
         Ok(false)
     }
 }
@@ -265,16 +242,11 @@ pub async fn remove_logical_source(
     let st = resp.status();
 
     if st.is_success() {
-        tracing::info!(logical_source = ls_name, "Logical source removed");
         Ok(true)
     } else if st.as_u16() == 404 {
         Ok(false) // wasn't there, no big deal
     } else {
         let body = resp.text().await?;
-        // log before returning, lost 2 hours debugging a 409 that only
-        // showed up as "ApiError" in the lifecycle logs. Never again.
-        tracing::warn!(logical_source = ls_name, status = st.as_u16(),
-            body = %body, "deleteLogicalSource rejected");
         Err(CoordinatorError::ApiError { status: st.as_u16(), body })
     }
 }
@@ -296,11 +268,9 @@ pub async fn remove_all_physical_sources_by_worker(
         Ok(true)
     } else if st.as_u16() == 404 {
         // endpoint doesn't exist in older NES versions
-        tracing::warn!(worker_id, "removeAllPhysicalSourcesByWorker endpoint not available");
         Ok(false)
     } else {
-        let body = resp.text().await?;
-        tracing::warn!(worker_id, status = st.as_u16(), body = %body, "could not nuke worker sources");
+        let _body = resp.text().await?;
         Ok(false)
     }
 }
@@ -321,9 +291,7 @@ pub async fn update_logical_source(
     if st.is_success() { return Ok(true); }
     if st.as_u16() == 404 { return Ok(false); }
 
-    let body = resp.text().await?;
-    tracing::warn!(logical_source = %schema.logical_source_name,
-        status = st.as_u16(), body = %body, "could not update logical source schema");
+    let _body = resp.text().await?;
     Ok(false)
 }
 
@@ -334,10 +302,6 @@ pub async fn check_coordinator_health(
 
     let resp = http().get(&url).timeout(Duration::from_secs(5)).send().await?;
     let ok = resp.status().is_success();
-    if !ok {
-        tracing::warn!(status = resp.status().as_u16(),
-            "Coordinator health check returned non-success status");
-    }
     Ok(ok)
 }
 
@@ -356,36 +320,36 @@ pub struct QueryEntry {
 pub async fn fetch_all_queries(
     coord_url: &str,
 ) -> Result<Vec<QueryEntry>, CoordinatorError> {
-    let url = format!("{}/v1/nes/queryCatalog/allRegisteredQueries",
+    let u = format!("{}/v1/nes/queryCatalog/allRegisteredQueries",
         coord_url.trim_end_matches('/'));
 
-    let resp = http().get(&url).send().await?;
-    let st = resp.status();
-    let body = resp.text().await?;
+    let r = http().get(&u).send().await?;
+    let s = r.status();
+    let raw = r.text().await?;
 
-    if !st.is_success() {
-        return Err(CoordinatorError::ApiError { status: st.as_u16(), body });
+    if !s.is_success() {
+        return Err(CoordinatorError::ApiError { status: s.as_u16(), body: raw });
     }
 
-    let parsed: serde_json::Value = serde_json::from_str(&body)
+    let v: serde_json::Value = serde_json::from_str(&raw)
         .map_err(|e| CoordinatorError::ApiError {
             status: 200, body: format!("bad query catalog json: {e}"),
         })?;
 
-    let mut out = Vec::new();
-    if let Some(queries) = parsed.as_array() {
-        for q in queries {
-            let qid = q.get("queryId").and_then(serde_json::Value::as_u64).unwrap_or(0);
-            let status = q.get("queryStatus")
+    let mut res = Vec::new();
+    if let Some(arr) = v.as_array() {
+        for q in arr {
+            let id = q.get("queryId").and_then(serde_json::Value::as_u64).unwrap_or(0);
+            let st = q.get("queryStatus")
                 .or_else(|| q.get("status"))
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or("UNKNOWN").to_string();
             let qs = q.get("queryString")
                 .and_then(serde_json::Value::as_str).unwrap_or("").to_string();
-            out.push(QueryEntry { query_id: qid, status, query_string: qs });
+            res.push(QueryEntry { query_id: id, status: st, query_string: qs });
         }
     }
-    Ok(out)
+    Ok(res)
 }
 
 pub async fn stop_query(
@@ -407,8 +371,7 @@ pub async fn stop_query(
 pub async fn stop_stale_queries(coord_url: &str, ls_name: &str) -> u32 {
     let queries = match fetch_all_queries(coord_url).await {
         Ok(q) => q,
-        Err(e) => {
-            tracing::warn!("could not fetch query catalog for stale cleanup: {e}");
+        Err(_e) => {
             return 0;
         }
     };
@@ -421,9 +384,6 @@ pub async fn stop_stale_queries(coord_url: &str, ls_name: &str) -> u32 {
 
     if stale.is_empty() { return 0; }
 
-    tracing::info!("Found {} stale query(ies) referencing '{}', stopping",
-        stale.len(), ls_name);
-
     let mut stopped = 0u32;
     for e in &stale {
         // TODO: parallelize with join_all? probably not worth it for <10 queries
@@ -433,9 +393,8 @@ pub async fn stop_stale_queries(coord_url: &str, ls_name: &str) -> u32 {
         ).await;
         match result {
             Ok(Ok(())) => stopped += 1,
-            Ok(Err(err)) => tracing::warn!(query_id = e.query_id, "stop query err: {err}"),
-            Err(_) => tracing::warn!(query_id = e.query_id,
-                "Timed out stopping stale query, skipping"),
+            Ok(Err(_err)) => {}
+            Err(_) => {}
         }
     }
     stopped
