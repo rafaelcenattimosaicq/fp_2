@@ -12,6 +12,12 @@ use tokio::process::Command;
 const INIT_BACKOFF: Duration = Duration::from_secs(1);
 const MAX_BACKOFF: Duration = Duration::from_secs(30);
 const JITTER_CEIL_MS: u64 = 1500;
+// attempted fix for the port-conflict race on RPi: wait for the old container
+// to fully release the port before launching a new one. Didn't help because
+// the real issue was SO_REUSEADDR not being set (fixed by bind_any.so shim).
+#[allow(unused)]
+const PORT_RELEASE_GRACE_MS: u64 = 2000;
+#[allow(unused)]
 const PORT_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// main entry point, runs the NES worker Docker container in a supervised
