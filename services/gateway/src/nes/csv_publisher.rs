@@ -2,18 +2,18 @@ use crate::device_descriptor::RegisterValue;
 use crate::nes::schema::NesSchema;
 use std::collections::HashMap;
 
-// nES Nautilus doesn't have a TEXT/VARCHAR type that works for variable-length
-// device IDs, so we hash them into UINT64. FNV-1a is good enough, we only
-// need collision resistance across ~hundreds of gateways at the client, not billions.
-// tried xxhash first but it pulled in a C dependency that didn't cross-compile
-// cleanly for armv7.
+// NES Nautilus doesn't have a TEXT/VARCHAR type for variable-length device
+// IDs, so we hash them into UINT64. FNV-1a is good enough; we only need
+// collision resistance across ~hundreds of gateways, not billions.
+// (tried xxhash first but it pulled in a C dependency that didn't
+// cross-compile cleanly for armv7)
 fn fnv1a_hash(s: &str) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut hash: u64 = 0xCBF2_9CE4_8422_2325;
     for b in s.bytes() {
-        h ^= u64::from(b);
-        h = h.wrapping_mul(0x0100_0000_01b3);
+        hash ^= u64::from(b);
+        hash = hash.wrapping_mul(0x0100_0000_01b3);
     }
-    h
+    hash
 }
 
 /// build a CSV line matching the NES schema field order. Used by the MQTT

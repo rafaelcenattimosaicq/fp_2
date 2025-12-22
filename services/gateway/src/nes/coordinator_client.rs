@@ -6,9 +6,6 @@ use std::time::Duration;
 // time the task restarts. All URLs come from VPN discovery or the gateway
 // config, never hardcoded. 15s timeout to handle cold-start latency.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
-// TODO: handle the case where coordinator is behind a load balancer
-// and the health check endpoint returns 200 but queries still fail
-const _LB_GRACE_PERIOD: Duration = Duration::from_secs(5);
 
 static HTTP: OnceLock<reqwest::Client> = OnceLock::new();
 
