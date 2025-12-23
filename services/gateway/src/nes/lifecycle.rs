@@ -11,17 +11,12 @@ use crate::vpn::VpnEndpoints;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 
-const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(10);
+const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(15);
 const MAX_REGISTER_ATTEMPTS: u32 = 10;
 // how long to wait for a stale worker node to disappear from the topology
 // before giving up and proceeding. 120s is generous but the coordinator's
 // heartbeat timeout is 60s and eviction can lag behind that.
 const STALE_NODE_TIMEOUT: Duration = Duration::from_secs(120);
-// debug: track how many restart cycles the lifecycle has gone through
-// since boot. Useful for correlating with CloudWatch logs when the
-// worker keeps crashing in a loop.
-// static RESTART_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
-// const MAX_LOGGED_RESTARTS: u32 = 50;
 
 /// orchestrates the full NES worker lifecycle: wait for device descriptor,
 /// build schema, register with coordinator, launch worker container, monitor
