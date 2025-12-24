@@ -141,38 +141,38 @@ pub async fn run_lifecycle(
 /// topology. Returns true if the node was evicted, false on timeout or error.
 async fn wait_for_node_eviction(coord_url: &str, nid: u32, state: &SharedState) -> bool {
     let deadline = tokio::time::Instant::now() + STALE_NODE_TIMEOUT;
-    let mut errs: u32 = 0;
+    let mut consecutive_errs: u32 = 0;
 
     loop {
+        if tokio::time::Instant::now() >= deadline {
+            tracing::warn!(node_id = nid, "Stale topology node still present after timeout");
+            return false;
+        }
+
         match find_node_in_topology(coord_url, nid).await {
-            Ok(true) => {
-                errs = 0;
-                if tokio::time::Instant::now() >= deadline {
-                    tracing::warn!(node_id = nid, "Stale topology node still present after timeout");
-                    return false;
-                }
-                let msg = format!("NES lifecycle: waiting for stale node {nid} to be evicted");
-                tracing::info!("{}", msg);
-                log(state, LogLevel::Info, &msg);
-                tokio::time::sleep(Duration::from_secs(5)).await;
-            }
             Ok(false) => {
                 tracing::info!(node_id = nid, "Stale node evicted, proceeding");
                 return true;
             }
+            Ok(true) => {
+                consecutive_errs = 0;
+                let msg = format!("NES lifecycle: waiting for stale node {nid} to be evicted");
+                tracing::info!("{}", msg);
+                log(state, LogLevel::Info, &msg);
+            }
             Err(e) => {
-                errs += 1;
+                consecutive_errs += 1;
                 // don't spin for 120s against a coordinator that's genuinely
-                // down, 3 failed fetches is enough to bail and let the outer
-                // loop handle the reconnect
-                if errs >= 3 {
+                // down, 3 consecutive failed fetches is enough to bail and
+                // let the outer loop handle the reconnect
+                if consecutive_errs >= 3 {
                     tracing::warn!(node_id = nid, error = %e,
                         "Coordinator unreachable during eviction wait, bailing");
                     return false;
                 }
-                tokio::time::sleep(Duration::from_secs(5)).await;
             }
         }
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
 
