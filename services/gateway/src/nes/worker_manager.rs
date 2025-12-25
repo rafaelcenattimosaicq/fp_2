@@ -9,7 +9,7 @@ use tokio::process::Command;
 // error, 1500ms was enough to stagger 8 RPis rebooted simultaneously during
 // the Joinville field test without being so large that a single gateway waits
 // too long on a quiet network.
-const INIT_BACKOFF: Duration = Duration::from_secs(1);
+const INIT_BACKOFF: Duration = Duration::from_secs(2);
 const MAX_BACKOFF: Duration = Duration::from_secs(30);
 const JITTER_CEIL_MS: u64 = 1500;
 // attempted fix for the port-conflict race on RPi: wait for the old container
