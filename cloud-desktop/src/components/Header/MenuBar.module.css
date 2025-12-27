@@ -1,0 +1,76 @@
+.menuBar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  -webkit-app-region: drag;
+}
+.menuItem {
+  position: relative;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: default;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+.menuItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  padding: 4px 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 24px 4px 12px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+.dropdownItem:hover {
+  background: var(--xl-green);
+  color: #fff;
+}
+.dropdownItemDisabled {
+  composes: dropdownItem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.shortcut {
+  margin-left: 32px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.dropdownItem:hover .shortcut {
+  color: rgba(255, 255, 255, 0.7);
+}
+.separator {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--border-default);
+}
