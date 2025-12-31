@@ -7,7 +7,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color 0.1s, background 0.1s, box-shadow 0.15s, transform 0.15s;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
   text-align: left;
   color: inherit;
   font: inherit;

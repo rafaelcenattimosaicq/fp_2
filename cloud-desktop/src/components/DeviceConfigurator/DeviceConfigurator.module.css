@@ -1,0 +1,97 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 8px);
+  padding: var(--space-sm, 8px);
+  overflow-y: auto;
+  flex: 1;
+}
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl, 32px) 0;
+  color: var(--text-muted, #888);
+  font-size: var(--text-sm, 13px);
+  font-style: italic;
+  text-align: center;
+}
+.paramRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+  padding: var(--space-xs, 4px) var(--space-sm, 8px);
+  border: 1px solid var(--border-default, #333);
+  background: var(--bg-secondary, #1e1e1e);
+  border-radius: var(--radius-sm, 4px);
+}
+.paramInfo {
+  flex: 1;
+  min-width: 0;
+}
+.paramName {
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  color: var(--text-primary, #e0e0e0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.paramMeta {
+  font-size: var(--text-xs, 11px);
+  color: var(--text-muted, #888);
+  font-family: var(--font-mono, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.paramInput {
+  width: 100px;
+  padding: 4px var(--space-xs, 4px);
+  font-size: var(--text-sm, 13px);
+  font-family: var(--font-mono, monospace);
+  text-align: right;
+  color: var(--text-primary, #e0e0e0);
+  background: var(--bg-primary, #111);
+  border: 1px solid var(--border-default, #333);
+  border-radius: var(--radius-sm, 4px);
+  outline: none;
+}
+.paramInput:focus {
+  border-color: var(--xl-green, #217346);
+}
+.sendBtn {
+  padding: 4px var(--space-md, 12px);
+  font-size: var(--text-xs, 11px);
+  font-family: var(--font-sans, sans-serif);
+  font-weight: 600;
+  color: #fff;
+  background: var(--xl-green, #217346);
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sendBtn:hover:not(:disabled) {
+  background: var(--xl-green-light, #2d9b5e);
+}
+.sendBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.ackSuccess {
+  font-size: var(--text-xs, 11px);
+  font-weight: 600;
+  color: var(--accent-green, #4ade80);
+  flex-shrink: 0;
+}
+.ackError {
+  font-size: var(--text-xs, 11px);
+  font-weight: 600;
+  color: var(--accent-red, #f87171);
+  flex-shrink: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
