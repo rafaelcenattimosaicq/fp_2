@@ -10,16 +10,6 @@ const PROTOCOLS = ['modbus', 'mqtt', 'opc-ua'] as const;
 // online guidelines say 128x128 PNG 
 const MAX_ICON_KB = 64 * 1024;
 
-  // TODO: move validation to a shared util so DeviceConfigurator can reuse it
-  // function validateDeviceId(id: string): string | null {
-  //   if (!id.trim()) return 'Device ID is required';
-  //   if (!/^0x[0-9a-fA-F]{4}$/.test(id)) return 'Must be hex format (e.g. 0x1234)';
-  //   return null;
-  // }
-  //
-  // function validateProtocol(proto: string): boolean {
-  //   return PROTOCOLS.includes(proto as any);
-
 interface Props {
   devices: DeviceRecord[];
   onAdd: (deviceId: string, protocol: string, icon?: string) => void;
