@@ -45,16 +45,18 @@ export function EChart(props: EChartProps): React.JSX.Element {
     let inst: ECharts | undefined;
     let dead = false; // cleanup flag
 
-    inst = init(el, theme);
-    readyCb.current?.(inst);
+    if (el.clientWidth > 0 && el.clientHeight > 0) {
+      inst = init(el, theme);
+      readyCb.current?.(inst);
+    }
 
     const ro = new ResizeObserver(() => {
       if (dead) return;
-      if (!inst) {
+      if (!inst && el.clientWidth > 0 && el.clientHeight > 0) {
         inst = init(el, theme);
         readyCb.current?.(inst);
       }
-      inst?.resize();
+      if (el.clientWidth > 0) inst?.resize();
     });
     ro.observe(el);
 
