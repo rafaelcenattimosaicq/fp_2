@@ -1,0 +1,64 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-canvas);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+}
+.row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.select,
+.operatorSelect,
+.input {
+  height: 24px;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 0 6px;
+  outline: none;
+}
+.select:focus,
+.operatorSelect:focus,
+.input:focus {
+  border-color: var(--xl-green);
+}
+.select {
+  flex: 1;
+  min-width: 0;
+}
+.operatorSelect {
+  width: 48px;
+  flex-shrink: 0;
+}
+.input {
+  flex: 1;
+  min-width: 0;
+}
+.addBtn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: #fff;
+  background: var(--xl-green);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.12s;
+}
+.addBtn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.addBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
