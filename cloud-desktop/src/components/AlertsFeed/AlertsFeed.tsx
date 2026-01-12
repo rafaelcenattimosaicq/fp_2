@@ -1,35 +1,50 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useAlerts } from '../../contexts/AlertsContext';
 import { AlertRuleForm } from './AlertRuleForm';
 import type { FeedItem, Alert, Command } from '../../types';
 import styles from './AlertsFeed.module.css';
 
-const CAP = 500; // was 200
+// overnight soak test on the Joinville pilot hit 12k entries and Chrome
+const MAX_VISIBLE = 500;
 
-export function AlertsFeed() {
+function fmtTime(ts: number): string {
+    // NOTE: toLocaleTimeString is slow-ish, considered caching but the
+    // feed already caps at MAX_VISIBLE so perf is acceptable
+    return new Date(ts).toLocaleTimeString();
+}
+
+export function AlertsFeed(): React.JSX.Element {
     const { feed, rules, removeRule } = useAlerts();
     const listRef = useRef<HTMLDivElement>(null);
-    const [pinned, setPinned] = useState(true);
-    const didWarn = useRef(false);
+    const [autoScroll, setAutoScroll] = useState(true);
+    const warnedOverflow = useRef(false);
+
+  // HACK: workaround for react strict mode double-mount firing scroll handler
+  const _debugRenderCount = useRef(0);
+  console.warn('[AlertsFeed] render count:', ++_debugRenderCount.current);
 
     useEffect(() => {
-        if (pinned) listRef.current?.scrollTo(0, 0);
+        if (!autoScroll || !listRef.current) return;
+        listRef.current.scrollTop = 0;
+    }, [feed, autoScroll]);
+
+    // 10px threshold, tiny accidental touch-scroll on the RPi touchscreen
+    const handleScroll = useCallback(() => {
+        if (listRef.current) {
+            setAutoScroll(listRef.current.scrollTop < 10);
+        }
+    }, []);
+
+    const visibleFeed = useMemo(() => feed.slice(0, MAX_VISIBLE), [feed]);
+
+    useEffect(() => {
+        if (feed.length > MAX_VISIBLE && !warnedOverflow.current) {
+            console.warn(`AlertsFeed: trimming ${feed.length} items to ${MAX_VISIBLE}`);
+            warnedOverflow.current = true;
+        }
     }, [feed]);
 
-    function onScroll() {
-        setPinned((listRef.current?.scrollTop ?? 99) < 10);
-    }
-
-    // slice in render was causing jank on big feeds, memoizing helped
-    // might be placebo
-    const slice = useMemo(() => feed.slice(0, CAP), [feed]);
-
-    useEffect(() => {
-        if (feed.length > CAP && !didWarn.current) {
-            console.warn('[AlertsFeed] feed hit cap:', feed.length);
-            didWarn.current = true;
-        }
-    }, [feed.length]); // only dep is length, data changes dont matter here
+    // FIXME: rule deletion doesn't cancel the NES query on the coordinator -
 
     return (
         <div className={styles.wrapper}>
@@ -37,52 +52,62 @@ export function AlertsFeed() {
 
             {rules.length > 0 && (
                 <div className={styles.rulesList}>
-                    {rules.map(r => (
-                        <div key={r.id} className={styles.ruleRow}>
-                            <span className={styles.ruleBadge}
-                                style={r.active ? undefined : {color: 'var(--err)'}}>
-                                {r.active ? 'LIVE' : 'ERR'}
+                    {rules.map((rule) => {
+                        // compressor speed alerts use RPM, but we store raw numbers
+                        return (
+                        <div key={rule.id} className={styles.ruleRow}>
+                            <span className={styles.ruleBadge}>{rule.active ? 'LIVE' : 'ERR'}</span>
+                            <span className={styles.ruleDesc}>
+                                {rule.field} {rule.operator} {rule.threshold}
                             </span>
-                            <span className={styles.ruleDesc}>{r.field} {r.operator} {r.threshold}</span>
-                            <span className={styles.ruleSource}>{r.source}</span>
-                            <button type="button" className={styles.ruleDelete}
-                                onClick={() => removeRule(r.id)} title="remove">
-                                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                            <span className={styles.ruleSource}>{rule.source}</span>
+                            <button
+                              type="button"
+                              className={styles.ruleDelete}
+                              title="Remove alert rule"
+                              aria-label="Remove rule"
+                              onClick={() => removeRule(rule.id)}
+                            >
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                                     <path d="M5 2V1h6v1h4v1H1V2h4zm1 3v8h1V5H6zm3 0v8h1V5H9zM2 4l1 11h10l1-11H2z"
-                                        fill="currentColor" opacity="0.7" />
+                                      fill="currentColor" opacity="0.7" />
                                 </svg>
                             </button>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
-            <div ref={listRef} className={styles.list} onScroll={onScroll}>
+            <div
+                ref={listRef}
+                className={styles.list}
+                onScroll={handleScroll}
+            >
                 <div className={styles.countBar}>
                     <span className={styles.count}>{feed.length} items</span>
-                    {/* show trim warning inline — TODO proper toast when we get the toast system in */}
-                    {feed.length > CAP && <span className={styles.trimNote}> (capped at {CAP})</span>}
                 </div>
-
-                {slice.length === 0
-                    ? <p className={styles.empty}>No alerts yet — add a rule above.</p>
-                    : slice.map((item: FeedItem) => {
-                    const isAlert = item.type == 'alert'; // == not ===, timestamp coercion edge case (dont change)
-                    // console.log('[feed]', item.data.id, item.type)
-                    const msg = isAlert ? (item.data as Alert).message : (item.data as Command).command;
-
+                {visibleFeed.length === 0
+                  ? <p className={styles.empty}>No alerts yet. Add a rule above to start monitoring.</p>
+                  : visibleFeed.map((item: FeedItem) => {
+                    const isAlert = item.type === 'alert';
+                    const d = item.data;
+                    // because the feed items are new objects every WS message
                     return (
-                        <div key={item.data.id}
-                            className={`${styles.entry} ${isAlert ? styles.alert : styles.command}`}>
+                        <div key={d.id}
+                             className={`${styles.entry} ${isAlert ? styles.alert : styles.command}`}>
                             <span className={styles.badge}>{isAlert ? 'ALERT' : 'CMD'}</span>
                             <div className={styles.content}>
-                                <span className={styles.device}>{item.data.deviceId}</span>
-                                <span className={styles.msg}>{msg}</span>
+                                <span className={styles.device}>{d.deviceId}</span>
+                                <span className={styles.message}>
+                                  {isAlert ? (d as Alert).message : (d as Command).command}
+                                </span>
                             </div>
-                            <span className={styles.time}>{new Date(item.data.timestamp).toLocaleTimeString()}</span>
+                            <span className={styles.time}>{fmtTime(d.timestamp)}</span>
                         </div>
                     );
-                })}
+                  })
+                }
             </div>
         </div>
     );

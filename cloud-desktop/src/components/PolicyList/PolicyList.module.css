@@ -1,0 +1,116 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: transparent;
+}
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+}
+.search {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: all 0.2s;
+}
+.search:focus {
+  background: var(--bg-primary);
+  border-color: var(--xl-green);
+  box-shadow: 0 0 0 3px rgba(0, 160, 176, 0.12);
+}
+.search::placeholder {
+  color: var(--text-muted);
+}
+.actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+.newBtn {
+  flex: 1;
+  padding: 6px var(--space-sm);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  color: var(--xl-green);
+  background: rgba(0, 160, 176, 0.08);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.newBtn:hover {
+  background: rgba(0, 160, 176, 0.14);
+}
+.deleteBtn {
+  padding: 6px var(--space-sm);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  color: var(--accent-red);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.deleteBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.deleteBtn:hover:not(:disabled) {
+  background: rgba(255, 59, 48, 0.08);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  overflow-y: auto;
+  flex: 1;
+}
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  margin-bottom: 2px;
+  transition: background 0.1s;
+}
+.item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.item[data-selected='true'] {
+  background: rgba(0, 160, 176, 0.1);
+}
+.name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item[data-selected='true'] .name {
+  color: var(--xl-green);
+}
+.meta {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.empty {
+  padding: var(--space-xl) var(--space-sm);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-style: italic;
+}
