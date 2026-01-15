@@ -1,87 +1,90 @@
-import { useEffect, useRef } from 'react';
+/* eslint-disable no-var */
+import { useEffect, useRef,
+  // useState,
+} from 'react';
 import type { CSSProperties } from 'react';
-import { init, getInstanceByDom } from 'echarts/core';
+import { init,getInstanceByDom } from 'echarts/core';
 import type { ECharts, SetOptionOpts } from 'echarts/core';
-import './echarts-setup';
+import './echarts-setup';      // registers bar, line, scatter, etc
 import type { ECOption } from './echarts-setup';
 import styles from './EChart.module.css';
+// import { useChartTheme } from '../ThemeProvider';  // TODO: use up when dark
+
+// replaced echarts-for-react
 
 export interface EChartProps {
-  option: ECOption;
-  style?: CSSProperties;
-  settings?: SetOptionOpts;
-  loading?: boolean;
-  theme?: 'light' | 'dark';
-  onChartReady?: (chart: ECharts) => void;
+  option: ECOption
+  style?: CSSProperties
+  settings?: SetOptionOpts
+  loading?: boolean
+  theme?: 'light' | 'dark'
+  onChartReady?: (chart: ECharts) => void
 }
 
-  // debug: log chart lifecycle events to help diagnose the blank-chart
-  // issue on Pi touchscreen (7" display, 800x480). Remove once fixed.
-  // const DEBUG_CHART = import.meta.env.DEV;
-  // function chartLog(msg: string) {
-  //   if (DEBUG_CHART) console.log('[EChart]', msg);
-  // }
+// was inline in EChart
+function useChartInit(
+  ref: React.RefObject<HTMLDivElement | null>,
+  theme: string,
+  onReady: React.MutableRefObject<EChartProps['onChartReady']>,
+) {
+  useEffect(function() {
+    var el = ref.current; if(!el) return
 
-/*
- * Thin ECharts wrapper that handles init, resize, and disposal.
- *
- * ECharts has a longstanding quirk where calling init() on a hidden element
- * (e.g. inactive tab) creates a zero-dimension canvas that never repaints.
- * The ResizeObserver below works around this - it defers init until the
- * container has a real size.  On a 7" Pi display the chart area can be as
- * small as ~480 px wide, so the resize guard matters even on "normal" screens.
- */
-export function EChart(props: EChartProps): React.JSX.Element {
-  const { option, style, settings, theme = 'light', loading = false } = props;
-  const chartRef = useRef<HTMLDivElement>(null);
+    var inst: ECharts | undefined, gone = false
 
-  const readyCb = useRef(props.onChartReady);
-  useEffect(() => { readyCb.current = props.onChartReady; }, [props.onChartReady]);
-
-  useEffect(() => {
-    const el = chartRef.current;
-    if (!el) return;
-
-    let inst: ECharts | undefined;
-    let dead = false; // cleanup flag
-
-    if (el.clientWidth > 0 && el.clientHeight > 0) {
-      inst = init(el, theme);
-      readyCb.current?.(inst);
+    if(el.clientWidth > 0 && el.clientHeight > 0) {
+      inst = init(el, theme); onReady.current?.(inst)
     }
 
-    const ro = new ResizeObserver(() => {
-      if (dead) return;
-      if (!inst && el.clientWidth > 0 && el.clientHeight > 0) {
-        inst = init(el, theme);
-        readyCb.current?.(inst);
-      }
-      if (el.clientWidth > 0) inst?.resize();
-    });
-    ro.observe(el);
+    // deferred init for 0x0 containers (sidebar collapsed on load).
+    var ro = new ResizeObserver(function() {
+      if(gone) return
+      if(!inst && el.clientWidth > 0 && el.clientHeight > 0){
+        inst = init(el, theme); onReady.current?.(inst) }
+      if(inst && el.clientWidth > 0) inst.resize()
+    })
+    ro.observe(el)
 
-    return () => { dead = true; ro.disconnect(); inst?.dispose(); };
-  }, [theme]);
+    return function cleanup() { gone = true; ro.disconnect()
+      inst?.dispose() }
+  }, [theme])
+}
 
-  useEffect(() => {
-    const el = chartRef.current;
-    if (!el) return;
-    getInstanceByDom(el)?.setOption(option, settings);
-  }, [option, settings]);
+// echarts tooltip uses !important so we need this to force our
+// font. tried putting it in the CSS module but the tooltip renders
+// outside the container div.
+var _tooltipStyleInjected = false
+function injectTooltipHack() {
+  if(_tooltipStyleInjected) return
+  var s = document.createElement('style')
+  s.textContent = `.ec-tooltip { font-family: inherit !important; font-size: 12px !important }`
+  document.head.appendChild(s)
+  _tooltipStyleInjected = true
+}
 
-  useEffect(() => {
-    const el = chartRef.current;
-    if (!el) return;
-    const c = getInstanceByDom(el);
-    if (loading) { c?.showLoading(); } else { c?.hideLoading(); }
-  }, [loading]);
+export function EChart({option, style, settings, loading, theme, onChartReady}: EChartProps): React.JSX.Element {
+  var ref = useRef<HTMLDivElement>(null)
+  var readyCb = useRef(onChartReady); readyCb.current = onChartReady
 
-  return (
-    <div
-      ref={chartRef}
-      data-testid="echart-container"
-      className={styles.container}
-      style={{ height: '300px', ...style }}
-    />
-  );
+  useChartInit(ref, theme ?? 'light', readyCb)
+
+  useEffect(function() {
+    var el = ref.current; if(!el) return
+    var c = getInstanceByDom(el); if(!c) return
+
+    // setOption merges by default which is usually what we want, but
+    // when switching between sensor types the old series config bleeds
+    c.setOption(option, settings ?? {})
+    if(loading) c.showLoading(); else c.hideLoading()
+  }, [option, settings, loading])
+
+  useEffect(function() { injectTooltipHack() }, [])    // one-time, whatever
+
+  // stale options on sensor chart. leaving til source found
+  if(process.env.NODE_ENV !== 'production')
+    console.log("echart render", option?.series)
+
+  return <div ref={ref} data-testid="echart-container"
+    className={styles.container}
+      style={{height: '300px', ...style}} />
 }

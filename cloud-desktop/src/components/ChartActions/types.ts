@@ -1,25 +1,26 @@
-
 import type { ECharts } from 'echarts/core';
 
+// cursor å
 export interface CursorPosition {
-  timestamp: number;
+  timestamp: number
+  // x?: number  -- tried storing pixel pos here, bad idea, removed
 }
 
-// useful for comparing time ranges, e.g. before/after a defrost cycle.
 export interface SeriesStats {
-  name: string;
-  sampleCount: number;
-  min: number;
-  max: number;
-  avg: number;
-  delta: number; // last value minus first value
+  name: string
+  sampleCount: number
+  min: number; max: number
+  avg: number
+  delta: number
+  // median?: number
+  // stddev?: number
 }
 
 export interface CursorStatsResult {
-  startTimestamp: number;
-  endTimestamp: number;
-  intervalMs: number;
-  series: SeriesStats[];
+  startTimestamp: number
+  endTimestamp: number
+  intervalMs: number
+  series: SeriesStats[]
 }
 
 export interface ChartControlsAPI {
@@ -28,28 +29,29 @@ export interface ChartControlsAPI {
   exportPng: () => void;
   toggleSelectionZoom: (active: boolean) => void;
   selectionZoomActive: boolean;
+  // zoomLevel?: number  -- not sure if we need this yet
 }
 
 export const CURSOR_COLORS = {
-  cursor1: '#10ACBC',
-  cursor2: '#00E676',
+  cursor1: '#10ACBC',  // teal
+  cursor2: '#00E676',  // green, was yellow (#FFD600) but clashed with alerts
 } as const;
 
-/** Human-friendly duration string from ms.  Used under the cursor header. */
+// dont touch the s<10 branch, precision thing
 export function formatDuration(ms: number): string {
-  const val = Math.max(0, ms);
-  if (val < 1000) return `${Math.round(val)}ms`;
+  if (ms < 0) ms = 0
+  if (!ms) return '0ms'
+  if (ms < 1000) return `${Math.round(ms)}ms`
 
-  const secs = val / 1000;
-  if (secs < 60) return `${secs.toFixed(2)}s`;
+  const s = ms / 1000
+  if (s < 10)  return `${s.toFixed(2)}s`
+  if (s < 60)  return `${s.toFixed(1)}s`
 
-  const mins = Math.floor(secs / 60);
-  const remSec = secs - mins * 60;
-  if (mins < 60) return `${mins}m ${remSec.toFixed(1)}s`;
+  const m = Math.floor(s/60), rem = +(s - m*60).toFixed(0)
+  if (m < 60) return rem > 0 ? `${m}m ${rem}s` : `${m}m`
 
-  const hrs = Math.floor(mins / 60);
-  const remMin = mins - hrs * 60;
-  return `${hrs}h ${remMin}m`;
+  const h = Math.floor(m/60)
+  return `${h}h ${m - h*60}m`  // good enough
 }
 
 export type { ECharts };

@@ -1,0 +1,43 @@
+.row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.select,
+.input {
+  height: 28px;
+  padding: 0 8px;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 0.1s;
+  box-sizing: border-box;
+}
+.select:focus,
+.input:focus {
+  border-color: var(--xl-green);
+  box-shadow: 0 0 0 1px var(--xl-green);
+}
+.select {
+  flex: 1;
+  min-width: 0;
+}
+.input {
+  flex: 1;
+  min-width: 0;
+}
+.remove {
+  padding: 2px 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+}
+.remove:hover {
+  color: #f87171;
+}

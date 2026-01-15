@@ -1,0 +1,60 @@
+.accent {
+  height: 1px;
+  background: var(--border-default);
+  flex-shrink: 0;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 30px;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+  box-shadow: none;
+}
+.spacer {
+  flex: 1;
+}
+.settingsWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+.gearBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+.gearBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.gearActive {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.content {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.vertical {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+}
+.loading {
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
