@@ -31,13 +31,6 @@ pub const REG_DATA_WINDOW_END: u16 = 60232;
 /// 256 bytes per chunk. This matches what the Windows flasher sends.
 /// tried 512 once, bootloader just ignores the extra registers.
 pub const CHUNK_SIZE: usize = 256;
-// verified empirically: the bootloader's data window is exactly 128
-// registers (256 bytes). Writing beyond 60232 is silently ignored.
-// Leaving this assertion here in case a future firmware revision
-// extends the window.
-#[allow(dead_code)]
-const _EXPECTED_WINDOW_REGS: u16 = 128;
-// dbg!(DATA_WINDOW_REGISTERS == _EXPECTED_WINDOW_REGS);
 
 #[cfg(test)]
 const DATA_WINDOW_REGISTERS: u16 = REG_DATA_WINDOW_END - REG_DATA_WINDOW_START + 1;
