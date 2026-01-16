@@ -1,13 +1,23 @@
-/* eslint-disable no-var */
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { FilterRow } from './FilterRow';
 import type {
-  QueryFilter, QueryRequest, AggregationFunction, WindowType,
+  QueryFilter,
+  QueryRequest,
+  AggregationFunction,
+  WindowType,
 } from '../../types';
 import type { QueryPreferences } from './QuerySettings';
 import styles from './QueryForm.module.css';
 
-interface SourceDescriptor { name: string; fields: string[] }
+const AGG_FNS: AggregationFunction[] = ['AVG', 'MIN', 'MAX', 'COUNT', 'SUM'];
+
+// configurable slide amount.  NES also supports "threshold" windows but
+const WIN_TYPES: WindowType[] = ['tumbling', 'sliding'];
+
+interface SourceDescriptor {
+  name: string;
+  fields: string[];
+}
 
 interface QueryFormProps {
   sources: SourceDescriptor[];
@@ -16,246 +26,296 @@ interface QueryFormProps {
   defaults?: QueryPreferences;
 }
 
-const SUPPORTED_AGGS: AggregationFunction[] = ['AVG','MIN','MAX','COUNT','SUM'];
-const SUPPORTED_WINDOWS: WindowType[] = ['tumbling','sliding'];
-// const SUPPORTED_WINDOWS: WindowType[] = ['tumbling','sliding','session'];
-
+// the actual C++ NES REST API call.
 export function QueryForm({
   sources,
   onSubmit,
   submitting,
   defaults,
 }: QueryFormProps): React.JSX.Element {
-
-  // ===================== form state =====================
-  const [source, setSource]       = useState(() => defaults?.defaultSource ?? '');
+  const [src, setSrc] = useState(() => defaults?.defaultSource ?? '');
   const [selectedFlds, setSelectedFlds] = useState<string[]>([]);
-  const [filters, setFilters]     = useState<QueryFilter[]>([]);
-  const [aggFunction, setAggFunction] = useState<AggregationFunction>(
-    () => (defaults?.defaultAggFunction ?? 'AVG') as AggregationFunction,
+  const [filters, setFilters] = useState<QueryFilter[]>([]);
+  const [aggFn, setAggFn] = useState<AggregationFunction>(
+    () => defaults?.defaultAggFunction ?? 'AVG',
   );
-  const [aggField, setAggField]   = useState('');
-  const [groupByFlds]             = useState<string[]>([]);
-  const [windowType, setWindowType] = useState<WindowType>(
-    () => (defaults?.defaultWindowType ?? 'tumbling') as WindowType,
+  const [aggField, setAggField] = useState('');
+  const [groupBy] = useState<string[]>([]);
+  const [winType, setWinType] = useState<WindowType>(
+    () => defaults?.defaultWindowType ?? 'tumbling',
   );
-  const [windowSeconds, setWindowSeconds] = useState(
+  const [winSize, setWinSize] = useState(
     () => defaults?.defaultWindowSize ?? 10,
   );
-  const [slideSeconds, setSlideSeconds] = useState(5);
+  const [winSlide, setWinSlide] = useState(5);
 
-  // -- join (added for the multi-source demo, week of oct 14) --
-  const [jSrc, setJSrc] = useState('');
-  const [jKey,setJKey] = useState('timestamp');
-  const [jFlds, setJFlds] = useState<string[]>([]);
-  // -- union --
-  const [uSrcs, setUSrcs] = useState<string[]>([]);
+  const [joinSrc, setJoinSrc] = useState('');
+  const [joinKey, setJoinKey] = useState('timestamp');
+  const [joinFlds, setJoinFlds] = useState<string[]>([]);
 
-  // ===================== defaults sync =====================
-  //
+  // union, merge same-schema sources (e.g. same device type on different gateways)
+  const [unionSrcs, setUnionSrcs] = useState<string[]>([]);
 
-  // flushSync, neither helped. rAF works. Don't touch this.
-  //
-  var _prefFprint = defaults
-    ? defaults.defaultSource+'|'+defaults.defaultAggFunction+'|'+defaults.defaultWindowType+'|'+defaults.defaultWindowSize
-    : '';
-  var _lastFprint = useRef(_prefFprint);
+  const appliedRef = useRef(
+    defaults
+      ? `${defaults.defaultSource}|${defaults.defaultAggFunction}|${defaults.defaultWindowType}|${defaults.defaultWindowSize}`
+      : '',
+  );
   useEffect(() => {
-    if(defaults == undefined) return;
-    var fp = defaults.defaultSource+'|'+defaults.defaultAggFunction+'|'+defaults.defaultWindowType+'|'+defaults.defaultWindowSize;
-    if(fp === _lastFprint.current) return;
-    _lastFprint.current = fp;
-    var raf = requestAnimationFrame(() => {
-      if(defaults.defaultSource && !source) setSource(defaults.defaultSource);
-      setAggFunction(defaults.defaultAggFunction);
-      setWindowType(defaults.defaultWindowType);
-      setWindowSeconds(defaults.defaultWindowSize);
+    if (!defaults) return;
+    const fp = `${defaults.defaultSource}|${defaults.defaultAggFunction}|${defaults.defaultWindowType}|${defaults.defaultWindowSize}`;
+    if (fp === appliedRef.current) return;
+    appliedRef.current = fp;
+
+    const id = requestAnimationFrame(() => {
+      if (defaults.defaultSource && !src) {
+        setSrc(defaults.defaultSource);
+      }
+      setAggFn(defaults.defaultAggFunction);
+      setWinType(defaults.defaultWindowType);
+      setWinSize(defaults.defaultWindowSize);
     });
-    return () => cancelAnimationFrame(raf)
-  }, [defaults, source]);
 
-  // ===================== derived =====================
+    return () => cancelAnimationFrame(id);
+  }, [defaults, src]);
 
-  const sourceFields = useMemo(
-    () => sources.find(s => s.name === source)?.fields ?? [],
-    [sources, source],
-  );
+  const flds = sources.find((s) => s.name === src)?.fields ?? [];
 
-  const joinableSources = useMemo(
-    () => sources.filter(s => s.name !== source),
-    [sources, source],
-  );
+  // are union-compatible, they have the same schema so NES can merge them
+  const unionCompat = (() => {
+    if (!src) return [];
+    const m = src.match(/^(.+)_GW-/i);
+    if (!m) return [];
+    return sources.filter((s) => s.name !== src && s.name.startsWith(m[1] + '_GW-'));
+  })();
+  const showUnion = unionCompat.length > 0 && !joinSrc;
 
-  var jSrcFlds: string[] = []
-  if(jSrc){ var _found = sources.find(s=>s.name==jSrc); if(_found) jSrcFlds=_found.fields }
+  const joinableSrcs = sources.filter((s) => s.name !== src);
+  const showJoin = src !== '' && joinableSrcs.length > 0;
 
-  var allFlds = sourceFields
-  if(jSrc && jSrcFlds.length){
-    allFlds = [...sourceFields]
-    jSrcFlds.forEach(f => { if(sourceFields.indexOf(f)===-1) allFlds.push(f) })
-  }
+  const joinSrcFlds = joinSrc
+    ? sources.find((s) => s.name === joinSrc)?.fields ?? []
+    : [];
 
-  
-  var unionCompat: SourceDescriptor[] = []
-  if(source){
-    var _m = source.match(/^(.+)_GW-/i)
-    if(_m){
-      var _pfx = _m[1]+'_GW-'
-      sources.forEach(s => {
-        if(s.name !== source && s.name.startsWith(_pfx)) unionCompat.push(s)
-      })
-    }
-  }
+  const allFlds = joinSrc
+    ? [...flds, ...joinSrcFlds.filter((f) => !flds.includes(f))]
+    : flds;
 
-  // ===================== handlers =====================
-
-  const toggleSelected = useCallback((field: string) => {
-    setSelectedFlds(prev =>
-      prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field],
+  const toggleField = useCallback((field: string) => {
+    setSelectedFlds((prev) =>
+      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field],
     );
   }, []);
 
-  const addEmptyFilter = useCallback(() => {
-    setFilters(prev => [...prev, { field: '', operator: '=', value: '' }]);
+  function toggleJoinFld(field: string): void {
+    setJoinFlds((prev) =>
+      prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field],
+    );
+  }
+
+  const addFilter = useCallback(() => {
+    setFilters((prev) => [...prev, { field: '', operator: '=', value: '' }]);
   }, []);
 
-  function changeSource(next: string) {
-    setSource(next);
-    setSelectedFlds([]);
-    setJSrc(''); setJKey('timestamp'); setJFlds([]);
-    setUSrcs([]);
+  const updateFilter = useCallback((idx: number, updated: QueryFilter) => {
+    setFilters((prev) => prev.map((f, i) => (i === idx ? updated : f)));
+  }, []);
+
+  function removeFilter(idx: number): void {
+    setFilters((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function doSubmit() {
-    if (!source) return;
+  // translate this into the NES REST API format
+  const handleSubmit = (): void => {
+    if (!src) return;
 
-    var activeFilters = [];
-    for (var i = 0; i < filters.length; i++) {
-      if (filters[i].field && filters[i].value) activeFilters.push(filters[i]);
-    }
-
-    var aggs: {function: AggregationFunction; field: string}[] = [];
-    if (aggField) {
-      aggs.push({ function: aggFunction, field: aggField });
-    }
-
-    // window config — 0 size means "no window"
-    var win: {type: WindowType; size: number; slide?: number} | null = null;
-    if (windowSeconds > 0) {
-      win = { type: windowType, size: windowSeconds };
-      if (windowType === 'sliding') {
-        win.slide = slideSeconds;
-      }
-    }
-
-    var req: QueryRequest = {
-      source: source,
+    const req: QueryRequest = {
+      source: src,
       fields: selectedFlds,
-      filters: activeFilters,
-      aggregations: aggs,
-      groupBy: groupByFlds,
-      window: win,
-      devices: [], // TQE resolves these from the source registry
+      filters: filters.filter((f) => f.field && f.value),
+      aggregations: aggField ? [{ function: aggFn, field: aggField }] : [],
+      groupBy,
+      window:
+        winSize > 0
+          ? {
+              type: winType,
+              size: winSize,
+              // slide only matters for sliding windows, tumbling windows
+              ...(winType === 'sliding' ? { slide: winSlide } : {}),
+            }
+          : null,
+      devices: [],
+      ...(joinSrc
+        ? {
+            joinSource: joinSrc,
+            joinKey: { left: joinKey, right: joinKey },
+            joinFields: joinFlds,
+          }
+        : {}),
+      ...(unionSrcs.length > 0 ? { unionSources: unionSrcs } : {}),
     };
 
-    if(jSrc){
-
-      req.joinSource = jSrc
-      req.joinKey = {left: jKey, right: jKey}
-      req.joinFields = jFlds
-    }
-
-    if(uSrcs.length) req.unionSources = uSrcs
-
-    // console.log('[submit]', JSON.stringify(req, null, 2))
     onSubmit(req);
-  }
-
-  // ===================== render =====================
+  };
 
   return (
     <div className={styles.form}>
-
+      {/* source dropdown - each source is a logical NES stream backed by
+          an MQTT_SOURCE or KAFKA_SOURCE depending on gateway config */}
       <label className={styles.label}>
         Source
         <select
           className={styles.select}
-          value={source}
-          onChange={e => changeSource(e.target.value)}
+          value={src}
+          onChange={(e) => {
+            setSrc(e.target.value);
+            setSelectedFlds([]);
+            setJoinSrc('');
+            setJoinKey('timestamp');
+            setJoinFlds([]);
+            setUnionSrcs([]);
+          }}
         >
           <option value="">Select source</option>
-          {sources.map(s => (
-            <option key={s.name} value={s.name}>{s.name}</option>
+          {sources.map((s) => (
+            <option key={s.name} value={s.name}>
+              {s.name}
+            </option>
           ))}
         </select>
       </label>
 
-      {sourceFields.length > 0 && (
+      {flds.length > 0 && (
         <fieldset className={styles.fieldset}>
           <legend className={styles.legend}>Fields</legend>
+          {/* these correspond to the .map() projection in NES DSL - unchecked
+              fields are still present in the stream but excluded from the
+              result schema the coordinator sends back */}
           <div className={styles.fields}>
-            {sourceFields.map(f => (
-              <label key={f} className={styles.checkbox}>
+            {flds.map((field) => (
+              <label key={field} className={styles.checkbox}>
                 <input
                   type="checkbox"
-                  checked={selectedFlds.includes(f)}
-                  onChange={() => toggleSelected(f)}
+                  checked={selectedFlds.includes(field)}
+                  onChange={() => toggleField(field)}
                 />
-                {f}
+                {field}
               </label>
             ))}
           </div>
         </fieldset>
       )}
 
-      {/* ---- join ---- */}
-      {jSrc && joinableSources.length > 0 && <fieldset className={styles.fieldset}>
+      {showJoin && (
+        <fieldset className={styles.fieldset}>
           <legend className={styles.legend}>Join With</legend>
           <div className={styles.joinRow}>
-            <label className={styles.label}>Join Source
-              <select className={styles.select} value={jSrc}
-                onChange={e=>{setJSrc(e.target.value);setJFlds([])}}>
+            <label className={styles.label}>
+              Join Source
+              <select
+                className={styles.select}
+                value={joinSrc}
+                onChange={(e) => {
+                  setJoinSrc(e.target.value);
+                  setJoinFlds([]);
+                }}
+                aria-label="Join source"
+              >
                 <option value="">No join</option>
-                {joinableSources.map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
-              </select></label>
-            {jSrc&&<label className={styles.label}>Join Key
-                <select className={styles.select} value={jKey} onChange={e=>setJKey(e.target.value)}>
-                  {sourceFields.filter(f=>{
-                    var o=sources.find(s=>s.name===jSrc); return o?o.fields.includes(f):false
-                  }).map(f=><option key={f} value={f}>{f}</option>)}</select></label>}
+                {joinableSrcs.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {joinSrc && (
+              <label className={styles.label}>
+                Join Key
+                <select
+                  className={styles.select}
+                  value={joinKey}
+                  onChange={(e) => setJoinKey(e.target.value)}
+                  aria-label="Join key"
+                >
+                  {flds
+                    .filter((f) => {
+                      const jf = sources.find((s) => s.name === joinSrc)?.fields ?? [];
+                      return jf.includes(f);
+                    })
+                    .map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
           </div>
-          {jSrc&&jSrcFlds.length>0&&<div className={styles.joinFields}>
+
+          {joinSrc && joinSrcFlds.length > 0 && (
+            <div className={styles.joinFields}>
               <span className={styles.joinFieldsLabel}>Join Source Fields</span>
-              <div className={styles.fields}>{jSrcFlds.map(f=>
-                <label key={f} className={styles.checkbox}>
-                  <input type="checkbox" checked={jFlds.includes(f)}
-                    onChange={()=>setJFlds(p=>p.includes(f)?p.filter(x=>x!==f):[...p,f])}/>{f}</label>)}
-              </div></div>}
-      </fieldset>}
+              <div className={styles.fields}>
+                {joinSrcFlds.map((field) => (
+                  <label key={field} className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={joinFlds.includes(field)}
+                      onChange={() => toggleJoinFld(field)}
+                    />
+                    {field}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </fieldset>
+      )}
 
-      {/* union — disabled when a join is active (TQE can't do both) */}
-      {unionCompat.length>0&&!jSrc&&<fieldset className={styles.fieldset}>
+      {/* union merges rows from multiple gateways running the same device
+          type - NES requires identical schemas on both sides */}
+      {showUnion && (
+        <fieldset className={styles.fieldset}>
           <legend className={styles.legend}>Union With (same device type)</legend>
-          <div className={styles.fields}>{unionCompat.map(s=>
-            <label key={s.name} className={styles.checkbox}>
-              <input type="checkbox" checked={uSrcs.includes(s.name)}
-                onChange={()=>setUSrcs(p=>p.includes(s.name)?p.filter(x=>x!==s.name):[...p,s.name])}/>{s.name}</label>)}
-          </div></fieldset>}
+          <div className={styles.fields}>
+            {unionCompat.map((s) => (
+              <label key={s.name} className={styles.checkbox}>
+                <input
+                  type="checkbox"
+                  checked={unionSrcs.includes(s.name)}
+                  onChange={() =>
+                    setUnionSrcs((prev) =>
+                      prev.includes(s.name)
+                        ? prev.filter((n) => n !== s.name)
+                        : [...prev, s.name],
+                    )
+                  }
+                />
+                {s.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
-      {/* ---- filters ---- */}
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>
           Filters
-          <button type="button" className={styles.addBtn} onClick={addEmptyFilter}>+ Add</button>
+          <button type="button" className={styles.addBtn} onClick={addFilter}>
+            + Add
+          </button>
         </legend>
+        {/* each filter becomes a .filter(Attribute("field") op value) in the
+            NES DSL - note NES doesn't support LIKE or regex on TEXT fields */}
         <div className={styles.filterList}>
-          {filters.map((f, i) => (
+          {filters.map((filter, i) => (
             <FilterRow
               key={i}
-              filter={f}
+              filter={filter}
               fields={allFlds}
-              onChange={updated => setFilters(prev => prev.map((x, idx) => idx === i ? updated : x))}
-              onRemove={() => setFilters(prev => prev.filter((_, idx) => idx !== i))}
+              onChange={(updated) => updateFilter(i, updated)}
+              onRemove={() => removeFilter(i)}
             />
           ))}
         </div>
@@ -264,39 +324,78 @@ export function QueryForm({
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Aggregation</legend>
         <div className={styles.aggRow}>
-          <select className={styles.select} value={aggFunction}
-            onChange={e => setAggFunction(e.target.value as AggregationFunction)}>
-            {SUPPORTED_AGGS.map(a => <option key={a} value={a}>{a}</option>)}
+          <select
+            className={styles.select}
+            value={aggFn}
+            onChange={(e) => setAggFn(e.target.value as AggregationFunction)}
+            aria-label="Aggregation function"
+          >
+            {AGG_FNS.map((fn) => (
+              <option key={fn} value={fn}>
+                {fn}
+              </option>
+            ))}
           </select>
-          <select className={styles.select} value={aggField}
-            onChange={e => setAggField(e.target.value)}>
+          <select
+            className={styles.select}
+            value={aggField}
+            onChange={(e) => setAggField(e.target.value)}
+            aria-label="Aggregation field"
+          >
             <option value="">No aggregation</option>
-            {allFlds.map(f => <option key={f} value={f}>{f}</option>)}
+            {allFlds.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
           </select>
         </div>
       </fieldset>
 
+      {/* window config - tumbling windows are simpler (just a size), sliding
+          windows need both size and slide.  The NES coordinator rejects
+          slide > size so we probably should validate that here.
+          TODO: add client-side validation for slide <= size */}
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Window</legend>
         <div className={styles.windowRow}>
-          <label className={styles.label}>Type
-            <select className={styles.select} value={windowType}
-              onChange={e => setWindowType(e.target.value as WindowType)}>
-              {SUPPORTED_WINDOWS.map(w =>
-                <option key={w} value={w}>{w}</option>
-              )}
+          <label className={styles.label}>
+            Type
+            <select
+              className={styles.select}
+              value={winType}
+              onChange={(e) => setWinType(e.target.value as WindowType)}
+              aria-label="Window type"
+            >
+              {WIN_TYPES.map((wt) => (
+                <option key={wt} value={wt}>
+                  {wt}
+                </option>
+              ))}
             </select>
           </label>
-          <label className={styles.label}>Size (s)
-            <input type="number" className={styles.input}
-              value={windowSeconds} min={0}
-              onChange={e => setWindowSeconds(Number(e.target.value))} />
+          <label className={styles.label}>
+            Size (s)
+            <input
+              type="number"
+              className={styles.input}
+              value={winSize}
+              min={0}
+              onChange={(e) => setWinSize(Number(e.target.value))}
+              aria-label="Window size"
+            />
           </label>
-          {windowType === 'sliding' && (
-            <label className={styles.label}>Slide (s)
-              <input type="number" className={styles.input}
-                value={slideSeconds} min={1}
-                onChange={e => setSlideSeconds(Number(e.target.value))} />
+          {winType === 'sliding' && (
+            <label className={styles.label}>
+              Slide (s)
+              <input
+                type="number"
+                className={styles.input}
+                value={winSlide}
+                min={1}
+                onChange={(e) => setWinSlide(Number(e.target.value))}
+                aria-label="Window slide"
+              />
             </label>
           )}
         </div>
@@ -305,8 +404,8 @@ export function QueryForm({
       <button
         type="button"
         className={styles.submit}
-        disabled={submitting || !source}
-        onClick={doSubmit}
+        disabled={submitting || !src}
+        onClick={handleSubmit}
       >
         {submitting ? 'Running...' : 'Run Query'}
       </button>

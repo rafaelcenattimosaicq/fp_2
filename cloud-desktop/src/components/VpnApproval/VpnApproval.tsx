@@ -1,30 +1,49 @@
-/* eslint-disable @typescript-eslint/no-unused-expressions */
 import { Fragment, useState, useEffect, useCallback } from 'react';
 import { useVpnService, isVpnApiConfigured } from '../../hooks/useVpnService';
 import { getToken } from '../../utils/getToken';
 import type { VpnRequest } from '../../types';
 import styles from './VpnApproval.module.css';
-import { formatEpoch } from '../../utils/formatDate';
 
-// poll every 10s, fast enough for admin but not spammy
-const POLL_MS = 10_000;
+// Tailscale VPN approval workflow. Each gateway in the field requests
+// the security team to review before the auth key is issued.
+// gateways that were pre-registered with a one-time enrollment token
+// TODO: add bulk-approve for multiple gateways when doing a fleet rollout
+// TODO: integrate with the client's internal ticketing system for audit trail
 
-function timeAgo(d: number): string {
-  if (!d) return '';
-  const secs = Math.floor(Date.now() / 1000 - d);
-  if (secs < 60) return 'just now';
-  const mins = Math.floor(secs / 60);
-  if(mins < 60) return `${mins} min ago`;
-  const hours = Math.floor(mins / 60);
-  if(hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+const POLL_MS = 15_000;
+
+const STALE_SECS = 45 * 60;
+
+  // TODO: add stale-request cleanup on component mount
+  // When the dashboard mounts we should check for any requests that have been
+  // sitting in "pending" for longer than STALE_SECS and auto-dismiss them
+  // so the approval queue doesn't accumulate cruft during field rollouts.
+  useEffect(() => {
+    // placeholder: will auto-dismiss stale VPN requests older than STALE_SECS
+    console.log('[VpnApproval] stale threshold:', STALE_SECS);
+    // return () => clearTimeout(cleanup);
+  }, []);
+
+function fmtTs(epoch: number): string {
+  if (!epoch) return '\u2014';
+  return new Date(epoch * 1000).toLocaleString();
 }
 
-// returns the right css class based on how high the trust score is
+function timeAgo(epoch: number): string {
+  if (!epoch) return '';
+  const secs = Math.floor(Date.now() / 1000 - epoch);
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 function trustCls(score: number | undefined): string {
   if (score === undefined) return styles.trustNone;
   if (score >= 80) return styles.trustHigh;
-  if(score >= 50) return styles.trustMedium;
+  if (score >= 50) return styles.trustMedium;
   return styles.trustLow;
 }
 
@@ -34,62 +53,64 @@ interface Props {
 
 export function VpnApproval({ className }: Props): React.JSX.Element | null {
   const { listRequests, approveRequest } = useVpnService();
-  const [requests, setRequests] = useState<VpnRequest[]>([]);
+  const [reqs, setReqs] = useState<VpnRequest[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [approving, setApproving] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  // tracks which gateway IDs are mid-approval so we can disable their buttons
+  const [approvingSet, setApprovingSet] = useState<Set<string>>(new Set());
+  const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
+  const [pendingConfirm, setPendingConfirm] = useState<string | null>(null);
 
-  const doRefresh = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!isVpnApiConfigured) return;
     try {
-      setLoading(true);
-      setError(null);
-      const data = await listRequests(await getToken());
-      // console.log('vpn requests loaded:', data.length);
-      setRequests(data.filter(r => r.status === 'pending'));
-    } catch(e) {
-      setError(e instanceof Error ? e.message : 'could not load VPN requests');
+      setLoading(true); setErr(null);
+      const tok = await getToken();
+      const data = await listRequests(tok);
+      setReqs(data.filter(r => r.status === 'pending'));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'could not load VPN requests');
     } finally {
       setLoading(false);
     }
   }, [listRequests]);
 
   useEffect(() => {
-    if(!isVpnApiConfigured) return;
-    doRefresh();
-    const interval = setInterval(doRefresh, POLL_MS);
-    return () => { clearInterval(interval); };
-  }, [doRefresh]);
+    if (!isVpnApiConfigured) return;
+    refresh();
+    const id = setInterval(refresh, POLL_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
 
-  const doApprove = useCallback(async (gwId: string) => {
-    if(confirmId !== gwId) {
-      setConfirmId(gwId);
+  const handleApprove = useCallback(async (gwId: string) => {
+    if (pendingConfirm !== gwId) {
+      setPendingConfirm(gwId);
       return;
     }
     try {
-      setApproving(prev => new Set(prev).add(gwId));
-      setConfirmId(null);
-      await approveRequest(gwId, await getToken());
-      setRequests(prev => prev.filter(r => r.gateway_id !== gwId));
+      setApprovingSet(prev => new Set(prev).add(gwId));
+      setPendingConfirm(null);
+      const tok = await getToken();
+      await approveRequest(gwId, tok);
+      // optimistic removal, the gateway won't appear on the next poll anyway
+      setReqs(prev => prev.filter(r => r.gateway_id !== gwId));
     } catch (e) {
       console.error('approve failed for', gwId, e);
-      setError(e instanceof Error ? e.message : `Failed to approve ${gwId}`);
+      setErr(e instanceof Error ? e.message : `Failed to approve ${gwId}`);
     } finally {
-      setApproving(prev => {
-        const next = new Set(prev);
-        next.delete(gwId);
-        return next;
+      setApprovingSet(prev => {
+        const nxt = new Set(prev);
+        nxt.delete(gwId);
+        return nxt;
       });
     }
-  }, [approveRequest, confirmId]);
+  }, [approveRequest, pendingConfirm]);
 
-  const doToggle = useCallback((gwId: string) => {
-    setExpanded(prev => {
-      const s = new Set(prev);
-      s.has(gwId) ? s.delete(gwId) : s.add(gwId);
-      return s;
+  const toggleExpand = useCallback((gwId: string) => {
+    setExpandedSet(prev => {
+      const nxt = new Set(prev);
+      if (nxt.has(gwId)) { nxt.delete(gwId); } else { nxt.add(gwId); }
+      return nxt;
     });
   }, []);
 
@@ -100,18 +121,18 @@ export function VpnApproval({ className }: Props): React.JSX.Element | null {
       <div className={styles.header}>
         <h3 className={styles.title}>VPN Authorization Requests</h3>
         <button type="button" className={styles.refreshBtn}
-          onClick={doRefresh} disabled={loading} aria-label="Refresh VPN requests">
+          onClick={refresh} disabled={loading} aria-label="Refresh VPN requests">
           {loading ? '...' : 'Refresh'}
         </button>
       </div>
 
-      {error && <p className={styles.error}>{error}</p>}
+      {err && <p className={styles.error}>{err}</p>}
 
-      {requests.length == 0 && !loading && !error && (
+      {reqs.length === 0 && !loading && !err && (
         <p className={styles.empty}>No pending authorization requests.</p>
       )}
 
-      {requests.length > 0 && (
+      {reqs.length > 0 && (
         <table className={styles.table}>
           <thead>
             <tr>
@@ -124,63 +145,75 @@ export function VpnApproval({ className }: Props): React.JSX.Element | null {
             </tr>
           </thead>
           <tbody>
-            {requests.map(item => {
-              const isStale = item.created_at > 0 && (Date.now()/1000 - item.created_at) > 30 * 60;
+            {reqs.map(req => {
+              const stale = req.created_at > 0
+                && (Date.now() / 1000 - req.created_at) > STALE_SECS;
+              const isExp = expandedSet.has(req.gateway_id);
               return (
-              <Fragment key={item.gateway_id}>
-                <tr className={isStale ? styles.staleRow : undefined}>
+              <Fragment key={req.gateway_id}>
+                <tr className={stale ? styles.staleRow : undefined}>
                   <td>
                     <button type="button" className={styles.expandBtn}
-                      onClick={() => doToggle(item.gateway_id)}
-                      aria-label={expanded.has(item.gateway_id) ? 'Collapse' : 'Expand'}>
-                      {expanded.has(item.gateway_id) ? '▾' : '▸'}
+                      onClick={() => toggleExpand(req.gateway_id)}
+                      aria-label={isExp ? 'Collapse' : 'Expand'}>
+                      {isExp ? '▾' : '▸'}
                     </button>
                   </td>
-                  <td className={styles.mono}>{item.gateway_id}</td>
-                  <td className={styles.mono}>{item.source_ip ?? '-'}</td>
+                  <td className={styles.mono}>{req.gateway_id}</td>
+                  <td className={styles.mono}>{req.source_ip ?? '-'}</td>
                   <td>
-                    <span className={`${styles.trustBadge} ${trustCls(item.trust_score)}`}>
-                      {item.trust_score !== undefined ? `${item.trust_score}/100` : 'N/A'}
+                    {/* trust score badge - computed from hardware fingerprint match */}
+                    <span className={`${styles.trustBadge} ${trustCls(req.trust_score)}`}>
+                      {req.trust_score !== undefined ? `${req.trust_score}/100` : 'N/A'}
                     </span>
-                    {item.registry_validated
+                    {req.registry_validated
                       ? <span className={styles.validatedTag}>✓ Registered</span>
-                      : <span className={styles.unregisteredTag}>Unregistered</span>
-                    }
+                      : <span className={styles.unregisteredTag}>Unregistered</span>}
                   </td>
                   <td>
-                    <span className={styles.time}>{!item.created_at ? '-' : formatEpoch(item.created_at)}</span>
-                    <span className={styles.ago}>{timeAgo(item.created_at)}</span>
-                    {isStale && <span className={styles.staleTag}>stale</span>}
+                    <span className={styles.time}>{fmtTs(req.created_at)}</span>
+                    <span className={styles.ago}>{timeAgo(req.created_at)}</span>
+                    {stale && <span className={styles.staleTag}>stale</span>}
                   </td>
                   <td>
-                    {/* approve / confirm */}
                     <button type="button" className={styles.approveBtn}
-                      onClick={() => doApprove(item.gateway_id)}
-                      disabled={approving.has(item.gateway_id)}>
-                      {approving.has(item.gateway_id) ? 'Approving...' : confirmId === item.gateway_id ? 'Confirm?' : 'Approve'}
+                      onClick={() => handleApprove(req.gateway_id)}
+                      disabled={approvingSet.has(req.gateway_id)}>
+                      {approvingSet.has(req.gateway_id) ? 'Approving...'
+                        : pendingConfirm === req.gateway_id ? 'Confirm?'
+                        : 'Approve'}
                     </button>
                   </td>
                 </tr>
 
-                {expanded.has(item.gateway_id) && item.fingerprint && (
+                {/* expanded row: hardware fingerprint details for manual verification */}
+                {isExp && req.fingerprint && (
                   <tr className={styles.detailRow}>
                     <td></td>
                     <td colSpan={5}>
                       <div className={styles.fingerprint}>
                         <span className={styles.fpLabel}>Hardware Fingerprint</span>
                         <div className={styles.fpGrid}>
-                          {([
-                            ['MAC Address', item.fingerprint.mac_address],
-                            ['CPU ID',       item.fingerprint.cpu_id],
-                            ['Serial Number', item.fingerprint.serial_number],
-                            ['Hostname',     item.fingerprint.hostname],
-                            ['OS Info',      item.fingerprint.os_info],
-                          ] as const).map(([label, val]) =>
-                            <div className={styles.fpField} key={label}>
-                              <span className={styles.fpKey}>{label}</span>
-                              <span className={styles.fpValue}>{val || '-'}</span>
-                            </div>
-                          )}
+                          <div className={styles.fpField}>
+                            <span className={styles.fpKey}>MAC Address</span>
+                            <span className={styles.fpValue}>{req.fingerprint.mac_address || '-'}</span>
+                          </div>
+                          <div className={styles.fpField}>
+                            <span className={styles.fpKey}>CPU ID</span>
+                            <span className={styles.fpValue}>{req.fingerprint.cpu_id || '-'}</span>
+                          </div>
+                          <div className={styles.fpField}>
+                            <span className={styles.fpKey}>Serial Number</span>
+                            <span className={styles.fpValue}>{req.fingerprint.serial_number || '-'}</span>
+                          </div>
+                          <div className={styles.fpField}>
+                            <span className={styles.fpKey}>Hostname</span>
+                            <span className={styles.fpValue}>{req.fingerprint.hostname || '-'}</span>
+                          </div>
+                          <div className={styles.fpField}>
+                            <span className={styles.fpKey}>OS Info</span>
+                            <span className={styles.fpValue}>{req.fingerprint.os_info || '-'}</span>
+                          </div>
                         </div>
                       </div>
                     </td>
