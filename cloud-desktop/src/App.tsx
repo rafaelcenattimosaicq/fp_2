@@ -13,7 +13,6 @@ import Gateways from './pages/Gateways';
 import Authorization from './pages/Authorization';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
-// TODO: lazy-load pages that use EChart to avoid loading echarts on login
 
 // wraps children with all the context providers needed for data
 function DataProviders({ children }: { children: React.ReactNode }): React.JSX.Element {
