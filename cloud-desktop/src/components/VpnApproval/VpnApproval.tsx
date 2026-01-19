@@ -14,16 +14,6 @@ const POLL_MS = 15_000;
 
 const STALE_SECS = 45 * 60;
 
-  // TODO: add stale-request cleanup on component mount
-  // When the dashboard mounts we should check for any requests that have been
-  // sitting in "pending" for longer than STALE_SECS and auto-dismiss them
-  // so the approval queue doesn't accumulate cruft during field rollouts.
-  useEffect(() => {
-    // placeholder: will auto-dismiss stale VPN requests older than STALE_SECS
-    console.log('[VpnApproval] stale threshold:', STALE_SECS);
-    // return () => clearTimeout(cleanup);
-  }, []);
-
 function fmtTs(epoch: number): string {
   if (!epoch) return '\u2014';
   return new Date(epoch * 1000).toLocaleString();
