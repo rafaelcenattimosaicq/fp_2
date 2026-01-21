@@ -6,7 +6,6 @@ import { AlertsProvider } from './contexts/AlertsContext';
 import { QueryProvider } from './contexts/QueryContext';
 import { HistoryProvider } from './contexts/HistoryContext';
 import { Dashboard } from './pages/Dashboard';
-// FirmwareUpdate lazy loaded below to avoid pulling in the upload chunk on every page
 import DevicePolicies from './pages/DevicePolicies';
 import { Login } from './pages/Login';
 import { DemoDataProvider } from './demo/DemoDataProvider';

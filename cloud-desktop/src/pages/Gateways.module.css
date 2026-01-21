@@ -1,0 +1,26 @@
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  padding: 0 var(--space-md);
+}
+.tabBtn {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tabBtn:hover {
+  color: var(--text-primary);
+}
+.tabBtnActive {
+  color: var(--text-primary);
+  border-bottom-color: var(--xl-green);
+}

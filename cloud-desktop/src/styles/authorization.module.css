@@ -1,0 +1,9 @@
+.page {
+  padding: var(--space-sm);
+  height: calc(100vh - 40px);
+  overflow: auto;
+  background: var(--bg-canvas);
+}
+.panel {
+  width: 100%;
+}
