@@ -4,6 +4,7 @@ import { GatewayRegistry } from '../components/GatewayRegistry/GatewayRegistry';
 import { GatewaySetup } from '../components/GatewayRegistry/GatewaySetup';
 import styles from './Gateways.module.css';
 
+// two tabs: registry for CRUD, setup guide for field technicians
 type GatewaysTab = 'registry' | 'setup';
 
 // tab switching for the gateways page

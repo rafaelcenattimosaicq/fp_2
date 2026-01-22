@@ -1,0 +1,183 @@
+.page {
+  padding: var(--space-lg);
+  max-width: 900px;
+}
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-md);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.uploadSection {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.uploadRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+.fileInput {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.fileInfo {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.deviceRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.deviceLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.chip:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+.chipActive {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+.uploadActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.uploadBtn {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--xl-green);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.uploadBtn:hover:not(:disabled) {
+  background: var(--xl-green-light);
+}
+.uploadBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.successMsg {
+  font-size: 13px;
+  color: var(--accent-green);
+}
+.errorMsg {
+  font-size: 13px;
+  color: var(--accent-red);
+}
+.muted {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.listSection {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+.table tr:last-child td {
+  border-bottom: none;
+}
+.table tr:hover td {
+  background: var(--bg-primary);
+}
+.nameCell {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+.statusCell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.badgeSuccess {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+.badgeProgress {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+.badgeFailed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+.deleteBtn {
+  font-size: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.1s;
+}
+.deleteBtn:hover {
+  background: var(--accent-red);
+  color: #fff;
+}

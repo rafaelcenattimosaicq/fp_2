@@ -21,12 +21,6 @@ const COLOURS = [
   '#fb7185', '#67e8f9', '#fbbf24', '#a78bfa',
 ];
 
-  // TODO: move chart colour palette to a shared theme config
-  // so telemetry charts and query result charts stay in sync
-  console.log('[QueryResultCard] COLOURS loaded, count:', COLOURS.length);
-  // const CHART_DEBUG = import.meta.env.DEV;
-  // if (CHART_DEBUG) console.log('chart debug mode enabled');
-
 function badgeCls(st: QueryStatus): string {
   const m: Record<QueryStatus, string> = {
     pending: styles.statusPending,

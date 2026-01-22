@@ -1,0 +1,1 @@
+export { FirmwareUpdate } from './FirmwareUpdate';
