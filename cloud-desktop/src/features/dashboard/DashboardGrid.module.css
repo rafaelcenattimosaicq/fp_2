@@ -1,0 +1,10 @@
+.grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+.canvas {
+  position: relative;
+  width: 100%;
+}
