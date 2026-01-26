@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router';
 import { QRCodeSVG } from 'qrcode.react';
 import {signOut as amplifySignOut} from 'aws-amplify/auth';
 import { useAuth } from '../contexts/AuthContext';
-import styles from './Login.module.css';
+import styles from '../styles/login.module.css';
 
 type LoginStep = 'credentials' | 'newPassword' | 'mfaSetup' | 'mfa';
 
