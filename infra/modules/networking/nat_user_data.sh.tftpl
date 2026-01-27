@@ -1,0 +1,150 @@
+#!/bin/bash
+set -ex
+
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/instance-id)
+
+aws ec2 modify-instance-attribute \
+  --instance-id "$INSTANCE_ID" \
+  --no-source-dest-check \
+  --region ${aws_region}
+
+aws ec2 replace-route \
+  --route-table-id ${route_table_id} \
+  --destination-cidr-block 0.0.0.0/0 \
+  --instance-id "$INSTANCE_ID" \
+  --region ${aws_region} || \
+aws ec2 create-route \
+  --route-table-id ${route_table_id} \
+  --destination-cidr-block 0.0.0.0/0 \
+  --instance-id "$INSTANCE_ID" \
+  --region ${aws_region}
+
+aws ec2 replace-route \
+  --route-table-id ${route_table_id} \
+  --destination-cidr-block 100.64.0.0/10 \
+  --instance-id "$INSTANCE_ID" \
+  --region ${aws_region} || \
+aws ec2 create-route \
+  --route-table-id ${route_table_id} \
+  --destination-cidr-block 100.64.0.0/10 \
+  --instance-id "$INSTANCE_ID" \
+  --region ${aws_region}
+
+echo 1 > /proc/sys/net/ipv4/ip_forward
+echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+
+ip route add 100.64.0.0/10 dev tailscale0 2>/dev/null || true
+
+yum install -y iptables-services
+iptables -t nat -A POSTROUTING -o ens5 -s ${vpc_cidr} -j MASQUERADE
+iptables -t nat -A POSTROUTING -o tailscale0 -s ${vpc_cidr} -j MASQUERADE
+iptables -t nat -A POSTROUTING -o ens5 -s 100.64.0.0/10 -p udp --dport 53 -j MASQUERADE
+iptables -t nat -A POSTROUTING -o ens5 -s 100.64.0.0/10 -p tcp --dport 53 -j MASQUERADE
+
+service iptables save
+systemctl enable iptables
+
+yum install -y amazon-ssm-agent
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+
+curl -fsSL https://tailscale.com/install.sh | sh
+
+# --- Tailscale connect helper (used by both boot and watchdog) ---
+cat > /usr/local/bin/tailscale-connect.sh << 'TSEOF'
+#!/bin/bash
+set -e
+
+TS_API_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id "${tailscale_secret_name}" \
+  --region ${aws_region} \
+  --query SecretString --output text)
+
+# reusable + preauthorized key, 90 day expiry (max allowed).
+# reusable means the same key works across reboots and reconnects
+# without needing a new one each time.
+TS_AUTH_KEY=$(curl -s -X POST "https://api.tailscale.com/api/v2/tailnet/-/keys" \
+  -u "$TS_API_KEY:" \
+  -H "Content-Type: application/json" \
+  -d '{"capabilities":{"devices":{"create":{"reusable":true,"ephemeral":false,"preauthorized":true}}},"expirySeconds":7776000}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin).get('key',''))")
+
+if [ -z "$TS_AUTH_KEY" ]; then
+  echo "ERROR: failed to get Tailscale auth key"
+  exit 1
+fi
+
+tailscale up --authkey="$TS_AUTH_KEY" \
+  --advertise-routes=${vpc_cidr} \
+  --accept-routes \
+  --hostname="${project}-${environment}-nat-vpn" \
+  --reset
+
+sleep 5
+
+# auto-approve the VPC route so edge gateways can reach private subnets
+TS_NODE_ID=$(tailscale status --json | python3 -c "import json,sys; print(json.load(sys.stdin)['Self']['ID'])")
+if [ -n "$TS_NODE_ID" ]; then
+  curl -s -X POST "https://api.tailscale.com/api/v2/device/$TS_NODE_ID/routes" \
+    -u "$TS_API_KEY:" \
+    -H "Content-Type: application/json" \
+    -d '{"routes":["${vpc_cidr}"]}' \
+    && echo "Tailscale route ${vpc_cidr} auto-approved for $TS_NODE_ID"
+fi
+TSEOF
+chmod +x /usr/local/bin/tailscale-connect.sh
+
+# initial connect
+/usr/local/bin/tailscale-connect.sh
+
+# --- Systemd watchdog: checks every 60s, reconnects if Tailscale is down ---
+cat > /usr/local/bin/tailscale-watchdog.sh << 'WDEOF'
+#!/bin/bash
+# if tailscale is not in Running state, reconnect
+STATE=$(tailscale status --json 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('BackendState',''))" 2>/dev/null)
+if [ "$STATE" != "Running" ]; then
+  echo "$(date): Tailscale state=$STATE, reconnecting..."
+  /usr/local/bin/tailscale-connect.sh
+else
+  # also verify we can actually route to the VPC (not just connected to controlplane)
+  if ! ping -c 1 -W 3 $(echo ${vpc_cidr} | sed 's|/.*||' | awk -F. '{printf "%s.%s.%s.1", $1, $2, $3}') > /dev/null 2>&1; then
+    echo "$(date): Tailscale running but VPC unreachable, restarting..."
+    tailscale down
+    sleep 2
+    /usr/local/bin/tailscale-connect.sh
+  fi
+fi
+WDEOF
+chmod +x /usr/local/bin/tailscale-watchdog.sh
+
+cat > /etc/systemd/system/tailscale-watchdog.service << 'SVCEOF'
+[Unit]
+Description=Tailscale VPN watchdog
+After=network.target tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/tailscale-watchdog.sh
+StandardOutput=journal
+StandardError=journal
+SVCEOF
+
+cat > /etc/systemd/system/tailscale-watchdog.timer << 'TMREOF'
+[Unit]
+Description=Run Tailscale watchdog every 60 seconds
+
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=60
+AccuracySec=10
+
+[Install]
+WantedBy=timers.target
+TMREOF
+
+systemctl daemon-reload
+systemctl enable tailscale-watchdog.timer
+systemctl start tailscale-watchdog.timer

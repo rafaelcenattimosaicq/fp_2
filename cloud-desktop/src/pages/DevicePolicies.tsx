@@ -15,227 +15,245 @@ import { getWritableParameters } from '../types/descriptor';
 import { DeviceConfigurator } from '../components/DeviceConfigurator/DeviceConfigurator';
 import { getToken } from '../utils/getToken';
 import styles from './DevicePolicies.module.css';
-import { formatISO } from '../utils/formatDate';
 
 type DevicesTab = 'policies' | 'firmware' | 'configure';
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes / 1024 < 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
 }
 
-function fmtDate(iso: string): string { return formatISO(iso) }
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
 
-
-// this whole tab ended up way bigger than I expected
 function PoliciesTab(): React.JSX.Element {
   const {
     policies, selectedPolicy, loadPolicies,
     selectPolicy, createNewPolicy, saveCurrentPolicy, removePolicy,
   } = usePolicies();
-  const svc = useDevicesService();
 
-  const [policyName, setPolicyName] = useState('');
-  const [policyContent, setPolicyContent] = useState('');
-  const [deviceIds, setDeviceIds] = useState<string[]>([]);
+  const devSvc = useDevicesService();
+
+  const [editName, setEditName] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editDeviceIds, setEditDeviceIds] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  const [selectLoading, setSelectLoading] = useState(false);
+  const [selecting, setSelecting] = useState(false);
 
   const deviceOwnership = useMemo(() => {
     const map: Record<string, string> = {};
     for (const p of policies) {
-      if (p.name === policyName) continue;
-      for (const d of p.deviceIds) map[d] = p.name;
+      if (p.name === editName) continue;
+      for (const id of p.deviceIds) map[id] = p.name;
     }
     return map;
-  }, [policies, policyName]);
+  }, [policies, editName]);
 
-  const [devices, setDevices] = useState<DeviceRecord[]>([]);
+  const [regDevices, setRegDevices] = useState<DeviceRecord[]>([]);
   const [devicesLoading, setDevicesLoading] = useState(false);
-  const [devicesError, setDevicesError] = useState<string|null>(null);
+  const [devicesErr, setDevicesErr] = useState<string | null>(null);
 
-  const fetchDevices = useCallback(async () => {
+  const loadDevices = useCallback(async () => {
     if (!isDevicesApiConfigured) return;
     setDevicesLoading(true);
-    setDevicesError(null);
+    setDevicesErr(null);
     try {
-      const token = await getToken();
-      if (!token) return;
-      // console.log('fetched devices count:', (await svc.listDevices(token)).length);
-      setDevices(await svc.listDevices(token));
-    } catch(e) {
-      setDevicesError(String(e));
+      const tok = await getToken();
+      if (!tok) return;
+      const devs = await devSvc.listDevices(tok);
+      setRegDevices(devs);
+    } catch (e) {
+      setDevicesErr(String(e));
     } finally {
       setDevicesLoading(false);
     }
-  }, [svc]);
+  }, [devSvc]);
 
   useEffect(() => {
     void loadPolicies();
-    void fetchDevices();
-  }, [loadPolicies, fetchDevices]);
+    void loadDevices();
+  }, [loadPolicies, loadDevices]);
 
-  async function handleAddDevice(d: string, e: string, x?: string): Promise<void> {
+  async function handleAddDevice(deviceId: string, protocol: string, icon?: string): Promise<void> {
     setDevicesLoading(true);
-    setDevicesError(null);
+    setDevicesErr(null);
     try {
-      await svc.saveDevice(d, e, await getToken(), x);
-      await fetchDevices();
-    } catch(e) {
-      setDevicesError(`Failed to add device: ${String(e)}`);
+      const tok = await getToken();
+      await devSvc.saveDevice(deviceId, protocol, tok, icon);
+      await loadDevices();
+    } catch (e) {
+      setDevicesErr(`Failed to add device: ${String(e)}`);
     } finally {
       setDevicesLoading(false);
     }
   }
 
-  async function handleDeleteDevice(d: string): Promise<void> {
+  async function handleDeleteDevice(deviceId: string): Promise<void> {
     setDevicesLoading(true);
-    setDevicesError(null);
+    setDevicesErr(null);
     try {
-      await svc.deleteDevice(d, await getToken());
-      await fetchDevices();
-    } catch(e) {
-      setDevicesError(`Failed to delete device: ${String(e)}`);
+      const tok = await getToken();
+      await devSvc.deleteDevice(deviceId, tok);
+      await loadDevices();
+    } catch (e) {
+      setDevicesErr(`Failed to delete device: ${String(e)}`);
     } finally {
       setDevicesLoading(false);
     }
   }
 
-  const handleSelectPolicy = useCallback(async (name: string) => {
-    setSelectLoading(true);
+  const handleSelect = useCallback(async (name: string) => {
+    setSelecting(true);
     try {
-      const res = await selectPolicy(name);
-      if (res != null) {
-        setPolicyName(res.name);
-        setPolicyContent(res.content);
-        setDeviceIds(res.deviceIds);
+      const policy = await selectPolicy(name);
+      if (policy) {
+        setEditName(policy.name);
+        setEditContent(policy.content);
+        setEditDeviceIds(policy.deviceIds);
         setSaveStatus('saved');
       }
     } finally {
-      setSelectLoading(false);
+      setSelecting(false);
     }
   }, [selectPolicy]);
 
-  function handleNewPolicy(): void {
+  function handleNew(): void {
     createNewPolicy();
-    setPolicyName('');
-    setPolicyContent('# new policy\nrules: []\n');
-    setDeviceIds([]);
+    setEditName('');
+    setEditContent('# new policy\nrules: []\n');
+    setEditDeviceIds([]);
     setSaveStatus('saved');
   }
 
-  function handleDeletePolicy(name: string) {
+  function handleDelete(name: string): void {
     void removePolicy(name);
-    if (policyName === name) {
-      setPolicyName(''); setPolicyContent(''); setDeviceIds([]); setSaveStatus('saved');
+    if (editName === name) {
+      setEditName('');
+      setEditContent('');
+      setEditDeviceIds([]);
+      setSaveStatus('saved');
     }
   }
 
   const handleSave = useCallback(async () => {
-    if (!policyName.trim()) return;
-    try { yaml.load(policyContent); }
-    catch (e) {
+    if (!editName.trim()) return;
+    try {
+      yaml.load(editContent);
+    } catch (e) {
+      const yamlErr = e instanceof Error ? e.message : 'Invalid YAML';
       setSaveStatus('unsaved');
-      alert(`YAML syntax error:\n${e instanceof Error ? e.message : 'Invalid YAML'}`);
+      alert(`YAML syntax error:\n${yamlErr}`);
       return;
     }
     setSaveStatus('saving');
     try {
-      await saveCurrentPolicy(policyName, policyContent, deviceIds);
+      await saveCurrentPolicy(editName, editContent, editDeviceIds);
       setSaveStatus('saved');
     } catch {
       setSaveStatus('unsaved');
     }
-  }, [policyName, policyContent, deviceIds, saveCurrentPolicy]);
+  }, [editName, editContent, editDeviceIds, saveCurrentPolicy]);
 
   return (
-    <div className={styles.fullPage}>
-      <div className={styles.devicesRow}>
-        <DeviceRegistry
-          devices={devices}
-          onAdd={(id, proto, icon) => { void handleAddDevice(id, proto, icon); }}
-          onDelete={(id) => { void handleDeleteDevice(id); }}
-          loading={devicesLoading}
-        />
-        {devicesError && <p className={styles.errorMsg}>{devicesError}</p>}
-      </div>
-
-      <div className={styles.policyArea}>
-        <div className={styles.policyCards}>
+    <div className={styles.layout}>
+      <div className={styles.sidebar}>
+        <div className={styles.registrySection}>
+          <DeviceRegistry
+            devices={regDevices}
+            onAdd={(id, proto, icon) => { void handleAddDevice(id, proto, icon); }}
+            onDelete={(id) => { void handleDeleteDevice(id); }}
+            loading={devicesLoading}
+          />
+          {devicesErr && <p className={styles.errorMsg}>{devicesErr}</p>}
+        </div>
+        <div className={styles.policySection}>
           <PolicyList
             policies={policies}
             selectedName={selectedPolicy?.name ?? null}
-            onSelect={(name) => { void handleSelectPolicy(name); }}
-            onNew={handleNewPolicy}
-            onDelete={handleDeletePolicy}
+            onSelect={(name) => { void handleSelect(name); }}
+            onNew={handleNew}
+            onDelete={handleDelete}
           />
         </div>
-        <div className={styles.editorArea}>
-          <PolicyEditor
-            policy={selectedPolicy}
-            name={policyName}
-            content={policyContent}
-            deviceIds={deviceIds}
-            devices={devices}
-            saveStatus={saveStatus}
-            loading={selectLoading}
-            onSave={() => { void handleSave(); }}
-            onContentChange={(c) => { setPolicyContent(c); setSaveStatus('unsaved'); }}
-            onNameChange={(n) => { setPolicyName(n); setSaveStatus('unsaved'); }}
-            onToggleDevice={(d) => {
-              setDeviceIds(prev =>
-                prev.includes(d) ? prev.filter(item => item !== d) : [...prev, d],
-              );
-              setSaveStatus('unsaved');
-            }}
-            onUpload={(filename, content) => {
-              setPolicyContent(content);
-              setSaveStatus('unsaved');
-              if (!policyName.trim()) setPolicyName(filename.replace(/\.ya?ml$/i, ''));
-            }}
-            deviceOwnership={deviceOwnership}
-          />
-        </div>
+      </div>
+
+      <div className={styles.editor}>
+        <PolicyEditor
+          policy={selectedPolicy}
+          name={editName}
+          content={editContent}
+          deviceIds={editDeviceIds}
+          devices={regDevices}
+          saveStatus={saveStatus}
+          loading={selecting}
+          onSave={() => { void handleSave(); }}
+          onContentChange={(v) => { setEditContent(v); setSaveStatus('unsaved'); }}
+          onNameChange={(v) => { setEditName(v); setSaveStatus('unsaved'); }}
+          onToggleDevice={(devId) => {
+            setEditDeviceIds(prev =>
+              prev.includes(devId) ? prev.filter(id => id !== devId) : [...prev, devId],
+            );
+            setSaveStatus('unsaved');
+          }}
+          onUpload={(filename, content) => {
+            setEditContent(content);
+            setSaveStatus('unsaved');
+            if (!editName.trim()) {
+              setEditName(filename.replace(/\.ya?ml$/i, ''));
+            }
+          }}
+          deviceOwnership={deviceOwnership}
+        />
       </div>
     </div>
   );
 }
 
+// ── Firmware Tab ─────────────────────────────────────────────────────────────
+
 function FirmwareTab(): React.JSX.Element {
   const { firmware, status, error, loadFirmware, upload, remove } = useFirmware();
-  const svc = useDevicesService();
+  const devSvc = useDevicesService();
 
-  const [devices, setDevices] = useState<DeviceRecord[]>([]);
-  const deviceIds = devices.map(d => d.device_id);
+  const [regDevices, setRegDevices] = useState<DeviceRecord[]>([]);
+  const devIds = regDevices.map(d => d.device_id);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [targetDevices, setTargetDevices] = useState<string[]>([]);
+  const [selFile, setSelFile] = useState<File | null>(null);
+  const [assignedDevs, setAssignedDevs] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void loadFirmware();
+
     if (isDevicesApiConfigured) {
       void (async () => {
         try {
-          const token = await getToken();
-          if (token != null) setDevices(await svc.listDevices(token));
-        } catch { }
+          const tok = await getToken();
+          if (tok) {
+            const devs = await devSvc.listDevices(tok);
+            setRegDevices(devs);
+          }
+        } catch { /* devices list is non-critical here */ }
       })();
     }
-  }, [loadFirmware, svc]);
+  }, [loadFirmware, devSvc]);
 
-  async function handleUpload(): Promise<void> {
-    if (selectedFile == null) return;
+  async function doUpload(): Promise<void> {
+    if (!selFile) return;
     setUploading(true);
     setUploadMsg('');
     try {
-      await upload(selectedFile.name, selectedFile, targetDevices);
-      setUploadMsg(`Uploaded ${selectedFile.name} successfully`);
-      setSelectedFile(null);
-      setTargetDevices([]);
+      await upload(selFile.name, selFile, assignedDevs);
+      setUploadMsg(`Uploaded ${selFile.name} successfully`);
+      setSelFile(null);
+      setAssignedDevs([]);
       if (fileRef.current) fileRef.current.value = '';
     } catch {
       setUploadMsg('Upload failed, check the log for details');
@@ -248,27 +266,35 @@ function FirmwareTab(): React.JSX.Element {
     <div className={styles.firmwarePage}>
       <section className={styles.uploadSection}>
         <h2 className={styles.sectionTitle}>Upload Firmware</h2>
+
         <div className={styles.uploadRow}>
-          <input ref={fileRef} type="file" accept=".bin"
-            onChange={e => { setSelectedFile(e.target.files?.[0] ?? null); setUploadMsg(''); }}
-            className={styles.fileInput} />
-          {selectedFile && (
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".bin"
+            onChange={(e) => { setSelFile(e.target.files?.[0] ?? null); setUploadMsg(''); }}
+            className={styles.fileInput}
+          />
+          {selFile && (
             <span className={styles.fileInfo}>
-              {selectedFile.name} ({fmtSize(selectedFile.size)})
+              {selFile.name} ({fmtSize(selFile.size)})
             </span>
           )}
         </div>
 
-        {deviceIds.length > 0 && (
+        {devIds.length > 0 && (
           <div className={styles.deviceRow}>
             <span className={styles.deviceLabel}>Assign to devices:</span>
             <div className={styles.chips}>
-              {deviceIds.map(id => (
-                <button key={id} type="button"
-                  className={`${styles.chip} ${targetDevices.includes(id) ? styles.chipActive : ''}`}
-                  onClick={() => setTargetDevices(prev =>
+              {devIds.map(id => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`${styles.chip} ${assignedDevs.includes(id) ? styles.chipActive : ''}`}
+                  onClick={() => setAssignedDevs(prev =>
                     prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
-                  )}>
+                  )}
+                >
                   {id}
                 </button>
               ))}
@@ -277,12 +303,19 @@ function FirmwareTab(): React.JSX.Element {
         )}
 
         <div className={styles.uploadActions}>
-          <button type="button" className={styles.uploadBtn}
-            disabled={!selectedFile || uploading}
-            onClick={() => { void handleUpload(); }}>
+          <button
+            type="button"
+            className={styles.uploadBtn}
+            disabled={!selFile || uploading}
+            onClick={() => { void doUpload(); }}
+          >
             {uploading ? 'Uploading...' : 'Upload'}
           </button>
-          {uploadMsg && <span className={error ? styles.errorMsg : styles.successMsg}>{uploadMsg}</span>}
+          {uploadMsg && (
+            <span className={error ? styles.errorMsg : styles.successMsg}>
+              {uploadMsg}
+            </span>
+          )}
         </div>
       </section>
 
@@ -291,15 +324,22 @@ function FirmwareTab(): React.JSX.Element {
 
         {status === 'loading' && <p className={styles.muted}>Loading...</p>}
         {status === 'error' && <p className={styles.errorMsg}>{error}</p>}
+
         {status !== 'loading' && firmware.length === 0 && (
           <p className={styles.muted}>No firmware files uploaded yet.</p>
         )}
 
         {firmware.length > 0 && (
           <table className={styles.table}>
-            <thead><tr>
-              <th>Name</th><th>Size</th><th>Uploaded</th><th>Devices</th><th></th>
-            </tr></thead>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th>Uploaded</th>
+                <th>Devices</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody>
               {firmware.map(fw => (
                 <tr key={fw.name}>
@@ -308,10 +348,13 @@ function FirmwareTab(): React.JSX.Element {
                   <td>{fmtDate(fw.lastModified)}</td>
                   <td>{fw.deviceIds.length > 0 ? fw.deviceIds.join(', ') : '\u2014'}</td>
                   <td>
-                    <button type="button" className={styles.fwDeleteBtn}
+                    <button
+                      type="button"
+                      className={styles.fwDeleteBtn}
                       onClick={() => { void remove(fw.name); }}
-                      title={`Delete ${fw.name}`}>
-                      {'\u2715'}
+                      title={`Delete ${fw.name}`}
+                    >
+                      ✕
                     </button>
                   </td>
                 </tr>
@@ -324,69 +367,72 @@ function FirmwareTab(): React.JSX.Element {
   );
 }
 
-
 function ConfigureTab(): React.JSX.Element {
-  const svc = useDevicesService();
+  const devSvc = useDevicesService();
   const { subscribe } = useMqtt();
 
-  const [devices, setDevices] = useState<DeviceRecord[]>([]);
-  const [gateways, setGateways] = useState<string[]>([]);
-  const seenGateways = useRef<Set<string>>(new Set());
-  const [selectedDevice, setSelectedDevice] = useState('');
-  const [selectedGateway, setSelectedGateway] = useState('');
-  const [writableParams, setWritableParams] = useState<DescriptorRegister[]>([]);
-  const [configError, setConfigError] = useState<string | null>(null);
-  const [loadingDescriptor, setLoadingDescriptor] = useState(false);
+  const [regDevices, setRegDevices] = useState<DeviceRecord[]>([]);
+  const [activeGws, setActiveGws] = useState<string[]>([]);
+  const seenGwsRef = useRef<Set<string>>(new Set());
+  const [selDeviceId, setSelDeviceId] = useState('');
+  const [gwId, setGwId] = useState('');
+  const [params, setParams] = useState<DescriptorRegister[]>([]);
+  const [cfgErr, setCfgErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
+  // fetch registered devices on mount
   useEffect(() => {
     if (!isDevicesApiConfigured) return;
     void (async () => {
       try {
         const tok = await getToken();
         if (!tok) return;
-        setDevices(await svc.listDevices(tok));
-      } catch { }
+        const devs = await devSvc.listDevices(tok);
+        setRegDevices(devs);
+      } catch { /* non-critical */ }
     })();
-  }, [svc]);
+  }, [devSvc]);
 
-  // track gateways from mqtt events
   useEffect(() => {
     const unsub = subscribe('controller_app/events', (_topic, payload) => {
       try {
-        const gwId = (JSON.parse(payload) as Record<string, unknown>).GATEWAY_ID;
-        if (typeof gwId === 'string' && gwId && !seenGateways.current.has(gwId)) {
-          seenGateways.current.add(gwId);
-          setGateways(Array.from(seenGateways.current));
+        const msg = JSON.parse(payload) as Record<string, unknown>;
+        const id = msg.GATEWAY_ID;
+        if (typeof id === 'string' && id && !seenGwsRef.current.has(id)) {
+          seenGwsRef.current.add(id);
+          setActiveGws(Array.from(seenGwsRef.current));
         }
-      } catch { }
+      } catch { /* malformed event, ignore */ }
     });
     return unsub;
   }, [subscribe]);
 
-  // finally got this working with the yaml descriptor parsing
-  async function loadDescriptor(deviceId: string) {
-    setConfigError(null);
-    setWritableParams([]);
+  async function loadDescriptor(deviceId: string): Promise<void> {
+    setCfgErr(null);
+    setParams([]);
     if (!deviceId) return;
-    setLoadingDescriptor(true);
+
+    setLoading(true);
     try {
-      const device = await svc.getDevice(deviceId, await getToken());
-      if (device.descriptor == null) {
-        setConfigError('No descriptor assigned to this device.'); return;
+      const tok = await getToken();
+      const device = await devSvc.getDevice(deviceId, tok);
+      if (!device.descriptor) {
+        setCfgErr('No descriptor assigned to this device.');
+        return;
       }
-      const params = getWritableParameters(yaml.load(device.descriptor) as DeviceDescriptor);
-      if (params.length === 0) {
-        setConfigError('Descriptor has no writable parameters (non-enum, non-bitwise).'); return;
+      const desc = yaml.load(device.descriptor) as DeviceDescriptor;
+      const writable = getWritableParameters(desc);
+      if (writable.length === 0) {
+        setCfgErr('Descriptor has no writable parameters (non-enum, non-bitwise).');
+        return;
       }
-      setWritableParams(params);
-    } catch(e) {
-      setConfigError(e instanceof Error ? e.message : 'Failed to load descriptor');
+      setParams(writable);
+    } catch (e) {
+      setCfgErr(e instanceof Error ? e.message : 'Failed to load descriptor');
     } finally {
-      setLoadingDescriptor(false);
+      setLoading(false);
     }
   }
-
-  const gwTrimmed = selectedGateway.trim();
 
   return (
     <div className={styles.configurePage}>
@@ -396,12 +442,20 @@ function ConfigureTab(): React.JSX.Element {
         <div className={styles.configureInputs}>
           <label className={styles.configureLabel}>
             Device
-            <select className={styles.configureSelect} value={selectedDevice}
-              onChange={e => { setSelectedDevice(e.target.value); void loadDescriptor(e.target.value); }}>
+            <select
+              className={styles.configureSelect}
+              value={selDeviceId}
+              onChange={(e) => {
+                setSelDeviceId(e.target.value);
+                void loadDescriptor(e.target.value);
+              }}
+            >
               <option value="">Select a device...</option>
-              {devices.map(d =>
-                <option key={d.device_id} value={d.device_id}>{d.device_id}</option>
-              )}
+              {regDevices.map(d => (
+                <option key={d.device_id} value={d.device_id}>
+                  {d.device_id}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -409,13 +463,13 @@ function ConfigureTab(): React.JSX.Element {
             Gateway
             <select
               className={styles.configureSelect}
-              value={selectedGateway}
-              onChange={(e) => setSelectedGateway(e.target.value)}
+              value={gwId}
+              onChange={(e) => setGwId(e.target.value)}
             >
               <option value="">
-                {gateways.length === 0 ? 'Waiting for telemetry...' : 'Select a gateway...'}
+                {activeGws.length === 0 ? 'Waiting for telemetry...' : 'Select a gateway...'}
               </option>
-              {gateways.map(gw => (
+              {activeGws.map(gw => (
                 <option key={gw} value={gw}>{gw}</option>
               ))}
             </select>
@@ -423,13 +477,18 @@ function ConfigureTab(): React.JSX.Element {
         </div>
       </section>
 
-      {loadingDescriptor && <p className={styles.muted}>Loading descriptor...</p>}
-      {configError && <p className={styles.errorMsg}>{configError}</p>}
+      {loading && <p className={styles.muted}>Loading descriptor...</p>}
+      {cfgErr && <p className={styles.errorMsg}>{cfgErr}</p>}
 
-      {writableParams.length > 0 && gwTrimmed !== '' && (
-        <DeviceConfigurator parameters={writableParams} deviceId={selectedDevice} gatewayId={gwTrimmed} />
+      {params.length > 0 && gwId.trim() && (
+        <DeviceConfigurator
+          parameters={params}
+          deviceId={selDeviceId}
+          gatewayId={gwId.trim()}
+        />
       )}
-      {writableParams.length > 0 && gwTrimmed === '' && (
+
+      {params.length > 0 && !gwId.trim() && (
         <p className={styles.muted}>Select a gateway to enable parameter writes.</p>
       )}
     </div>
@@ -442,15 +501,27 @@ function DevicePoliciesInner(): React.JSX.Element {
   return (
     <>
       <div className={styles.tabBar}>
-        <button type="button"
+        <button
+          type="button"
           className={`${styles.tabBtn} ${tab === 'policies' ? styles.tabBtnActive : ''}`}
-          onClick={() => setTab('policies')}>Policies</button>
-        <button type="button"
+          onClick={() => setTab('policies')}
+        >
+          Policies
+        </button>
+        <button
+          type="button"
           className={`${styles.tabBtn} ${tab === 'firmware' ? styles.tabBtnActive : ''}`}
-          onClick={() => setTab('firmware')}>Firmware</button>
-        <button type="button"
+          onClick={() => setTab('firmware')}
+        >
+          Firmware
+        </button>
+        <button
+          type="button"
           className={`${styles.tabBtn} ${tab === 'configure' ? styles.tabBtnActive : ''}`}
-          onClick={() => setTab('configure')}>Configure</button>
+          onClick={() => setTab('configure')}
+        >
+          Configure
+        </button>
       </div>
 
       {tab === 'policies' && <PoliciesTab />}

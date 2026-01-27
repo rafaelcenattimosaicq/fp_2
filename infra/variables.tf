@@ -1,7 +1,7 @@
 variable "project" {
-  description = "Project name prefix for all resources"
+  description = "Project name prefix (shared across all infra modules)"
   type        = string
-  default     = "iot-platform"
+  default     = "iot-platform"  # used by all modules
 }
 
 variable "environment" {
