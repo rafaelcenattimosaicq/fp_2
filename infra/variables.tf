@@ -32,9 +32,9 @@ variable "alert_email" {
 }
 
 variable "domain_name" {
-  description = "Domain name for ACM certificate (e.g. iot.example.com). Leave empty to skip ACM."
+  description = "Domain name for ACM certificate and Cognito hosted UI (e.g. iot.example.com). Leave empty to skip ACM."
   type        = string
-  default     = ""
+  default     = ""  # skips ACM + Route53 resources entirely
 }
 
 variable "registry_admin_token" {
