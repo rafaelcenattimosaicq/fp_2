@@ -11,8 +11,8 @@ use thiserror::Error;
 
 use crate::config::GatewayConfig;
 
-const IMAGE_PULL_RETRIES: u32 = 3;
-const IMAGE_PULL_RETRY_DELAY: Duration = Duration::from_secs(5);
+const IMAGE_PULL_RETRIES: u32 = 3;  // ECR pulls can be flaky behind NAT
+const IMAGE_PULL_RETRY_DELAY: Duration = Duration::from_secs(5);  // generous delay for Pi Zero
 
 #[derive(Debug, Error)]
 pub enum DockerError {
@@ -45,39 +45,33 @@ fn rules_container_name(gateway_id: &str) -> String {
 }
 
 pub async fn pull_image(docker: &Docker, image: &str) -> Result<(), DockerError> {
-    for attempt in 1..=IMAGE_PULL_RETRIES {
-        let opts = CreateImageOptions {
+    for idx in 1..=IMAGE_PULL_RETRIES {
+        let x = CreateImageOptions {
             from_image: image,
             ..Default::default()
         };
 
-        let mut stream = docker.create_image(Some(opts), None, None);
-        let mut last_error = None;
-        while let Some(result) = stream.next().await {
-            match result {
+        let mut s = docker.create_image(Some(x), None, None);
+        let mut tmp = None;
+        while let Some(r) = s.next().await {
+            match r {
                 Ok(_) => {}
                 Err(e) => {
-                    last_error = Some(e.to_string());
+                    tmp = Some(e.to_string());
                 }
             }
         }
 
-        if last_error.is_none() {
+        if tmp.is_none() {
             return Ok(());
         }
 
-        if attempt < IMAGE_PULL_RETRIES {
-            tracing::warn!(
-                image,
-                attempt,
-                error = last_error.as_deref().unwrap_or("unknown"),
-                "image pull failed, retrying"
-            );
+        if idx < IMAGE_PULL_RETRIES {
             tokio::time::sleep(IMAGE_PULL_RETRY_DELAY).await;
         } else {
             return Err(DockerError::ImagePull {
                 image: image.to_string(),
-                reason: last_error.unwrap_or_else(|| "unknown error".to_string()),
+                reason: tmp.unwrap_or_else(|| "unknown error".to_string()),
             });
         }
     }
@@ -91,17 +85,15 @@ async fn ensure_container(
     container_config: Config<String>,
 ) -> Result<String, DockerError> {
     match docker.inspect_container(name, None).await {
-        Ok(info) => {
-            let running = info
+        Ok(data) => {
+            let ok = data
                 .state
                 .as_ref()
                 .and_then(|s| s.running)
                 .unwrap_or(false);
-            if running {
-                tracing::info!(name, "container already running, reusing");
-                return Ok(info.id.unwrap_or_default());
+            if ok {
+                return Ok(data.id.unwrap_or_default());
             }
-            tracing::info!(name, "container exists but stopped, removing");
             docker
                 .remove_container(
                     name,
@@ -123,17 +115,17 @@ async fn ensure_container(
         pull_image(docker, image).await?;
     }
 
-    let create_opts = CreateContainerOptions {
+    let co = CreateContainerOptions {
         name: name.to_string(),
         ..Default::default()
     };
-    let response = docker
-        .create_container(Some(create_opts), container_config)
+    let r = docker
+        .create_container(Some(co), container_config)
         .await?;
     docker
-        .start_container(&response.id, None::<StartContainerOptions<String>>)
+        .start_container(&r.id, None::<StartContainerOptions<String>>)
         .await?;
-    Ok(response.id)
+    Ok(r.id)
 }
 
 pub struct DockerGuard {
@@ -144,15 +136,11 @@ pub struct DockerGuard {
 impl DockerGuard {
     pub async fn cleanup(&self) {
         for name in &self.container_names {
-            tracing::info!(name, "stopping container");
-            if let Err(e) = self
+            let _ = self
                 .docker
                 .stop_container(name, Some(StopContainerOptions { t: 10 }))
-                .await
-            {
-                tracing::warn!(name, error = %e, "failed to stop container");
-            }
-            if let Err(e) = self
+                .await;
+            let _ = self
                 .docker
                 .remove_container(
                     name,
@@ -161,10 +149,7 @@ impl DockerGuard {
                         ..Default::default()
                     }),
                 )
-                .await
-            {
-                tracing::warn!(name, error = %e, "failed to remove container");
-            }
+                .await;
         }
     }
 
@@ -182,27 +167,25 @@ fn generate_mqtt_password() -> String {
     // mosquitto instance on 127.0.0.1. rand crate was too heavy for the
     // cross-compile toolchain at the time.
     use std::time::{SystemTime, UNIX_EPOCH};
-    let seed = SystemTime::now()
+    let s = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0u64, |d| {
             #[allow(clippy::cast_possible_truncation, reason = "nanos since epoch will not exceed u64 for centuries")]
             let n = d.as_nanos() as u64;
             n
         });
-    let mut state = seed;
+    let mut v = s;
     (0..32)
-        .fold(String::with_capacity(64), |mut acc, _| {
-            state = state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        .fold(String::with_capacity(64), |mut buf, _| {
+            v = v.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
             #[allow(clippy::cast_possible_truncation, reason = "intentionally extracting low 8 bits from shifted u64")]
-            let byte = (state >> 33) as u8;
+            let b = (v >> 33) as u8;
             use std::fmt::Write;
-            let _ = write!(acc, "{byte:02x}");
-            acc
+            let _ = write!(buf, "{b:02x}");
+            buf
         })
 }
 
-/// on the Pi, systemd sometimes starts us before dockerd has created the socket.
-/// we retry the connection a few times before giving up.
 const DOCKER_CONNECT_RETRIES: u32 = 5;
 const DOCKER_CONNECT_DELAY: Duration = Duration::from_secs(2);
 
@@ -214,11 +197,10 @@ pub async fn ensure_containers(
     let docker = Docker::connect_with_local_defaults()?;
 
     let mut last_err = None;
-    for attempt in 1..=DOCKER_CONNECT_RETRIES {
+    for _attempt in 1..=DOCKER_CONNECT_RETRIES {
         match docker.ping().await {
             Ok(_) => { last_err = None; break; }
             Err(e) => {
-                tracing::warn!(attempt, "Docker daemon not ready yet: {e}");
                 last_err = Some(e);
                 tokio::time::sleep(DOCKER_CONNECT_DELAY).await;
             }
@@ -227,8 +209,6 @@ pub async fn ensure_containers(
     if let Some(e) = last_err {
         return Err(DockerError::Connection(e));
     }
-    tracing::info!("Docker daemon connected");
-
     let update_status = |state: &crate::state::SharedState,
                           name: &str,
                           status: crate::state::ServiceStatus| {
@@ -357,11 +337,8 @@ pub async fn ensure_containers(
     let bridge_name = bridge_container_name(gateway_id);
     let bridge_image = &cfg.docker.rules_engine_image;
 
-    // check if the bridge image is already available locally before starting
-    let bridge_image_present = docker.inspect_image(bridge_image).await.is_ok();
-    if !bridge_image_present {
-        tracing::info!(image = %bridge_image, "bridge image not cached, will pull during create");
-    }
+    // check if the bridge image is already available
+    let _bridge_image_present = docker.inspect_image(bridge_image).await.is_ok();
 
     let bridge_env = vec![
         "MQTT_HOST=127.0.0.1".to_string(),
@@ -394,7 +371,6 @@ pub async fn ensure_containers(
         let worker_image = &worker_cfg.image;
         update_status(state, "NES worker", crate::state::ServiceStatus::Pulling);
         if let Err(e) = pull_image(&docker, worker_image).await {
-            tracing::warn!(image = %worker_image, error = %e, "NES worker image pre-pull failed");
             update_status(state, "NES worker", crate::state::ServiceStatus::Error(e.to_string()));
         } else {
             update_status(state, "NES worker", crate::state::ServiceStatus::Pending);
@@ -415,8 +391,7 @@ pub async fn health_check_loop(
 ) {
     let docker = match Docker::connect_with_local_defaults() {
         Ok(d) => d,
-        Err(e) => {
-            tracing::error!(error = %e, "health check: cannot connect to Docker");
+        Err(_e) => {
             return;
         }
     };
@@ -434,25 +409,18 @@ pub async fn health_check_loop(
         tokio::time::sleep(HEALTH_CHECK_INTERVAL).await;
 
         for container_name in &names {
-            // fixme: should actually restart the container not just log, RC
-            if let Err(e) = check_container(&docker, container_name).await {
-                tracing::warn!("health check failed for {container_name}: {e}");
-            }
+            // here fixme: should actually restart the container not just log, RC
+            let _ = check_container(&docker, container_name).await;
         }
     }
 }
 
 async fn check_container(docker: &Docker, name: &str) -> Result<(), DockerError> {
     match docker.inspect_container(name, None).await {
-        Ok(info) => {
-            let running = info.state.as_ref().and_then(|s| s.running).unwrap_or(false);
-            if !running {
-                tracing::warn!(name, "container is not running");
-            }
+        Ok(_info) => {
             Ok(())
         }
         Err(bollard::errors::Error::DockerResponseServerError { status_code: 404, .. }) => {
-            tracing::warn!(name, "container not found, may have been removed");
             Ok(())
         }
         Err(e) => Err(DockerError::Connection(e)),
