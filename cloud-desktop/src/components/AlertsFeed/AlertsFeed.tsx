@@ -19,10 +19,6 @@ export function AlertsFeed(): React.JSX.Element {
     const [autoScroll, setAutoScroll] = useState(true);
     const warnedOverflow = useRef(false);
 
-  // HACK: workaround for react strict mode double-mount firing scroll handler
-  const _debugRenderCount = useRef(0);
-  console.warn('[AlertsFeed] render count:', ++_debugRenderCount.current);
-
     useEffect(() => {
         if (!autoScroll || !listRef.current) return;
         listRef.current.scrollTop = 0;
