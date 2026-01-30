@@ -19,8 +19,8 @@ variable "aws_region" {
 }
 
 variable "nat_instance_type" {
-  description = "EC2 instance type for the NAT instance (cost-optimised default: t4g.nano ~$3/mo)"
-  type        = string
+  description = "EC2 instance type for the NAT instance (cost-optimised: t4g.nano ~$3/mo vs $32/mo NAT GW)"
+  type        = string  # arm64 only; x86 instances would need a different AMI
   default     = "t4g.nano"
 }
 
