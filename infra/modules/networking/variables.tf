@@ -35,7 +35,3 @@ variable "nat_instance_profile_name" {
   type        = string
   default     = ""
 }
-  # TODO: add lifecycle policy for NAT instance replacement
-  # variable "nat_max_age_days" {
-  #   default = 30
-  # }

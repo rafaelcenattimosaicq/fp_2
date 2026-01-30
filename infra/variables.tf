@@ -42,11 +42,3 @@ variable "registry_admin_token" {
   type        = string
   sensitive   = true
 }
-  # placeholder for NAT instance SSH access during initial infra debugging
-  variable "nat_key_pair" {
-    description = "EC2 key pair for SSH into NAT instance (debug only)"
-    type        = string
-    default     = "CHANGEME"
-  }
-
-  # TODO: remove once SSM Session Manager is confirmed working on ARM
