@@ -14,9 +14,9 @@ variable "aws_region" {
 }
 
 variable "registry_admin_token" {
-  description = "Admin bearer token for the registry API"
+  description = "Admin bearer token for the registry API (rotated via Secrets Manager)"
   type        = string
-  sensitive   = true
+  sensitive   = true  # never appears in plan output
 }
 
 variable "domain_name" {
