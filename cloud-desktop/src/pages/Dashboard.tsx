@@ -4,29 +4,27 @@ import { DeviceFleet } from '../components/DeviceFleet/DeviceFleet';
 import { DashboardGrid } from '../features/dashboard/DashboardGrid';
 import '../styles/dashboard.css';
 
+// Main dashboard, fleet panel on top, draggable block grid below.
+// smaller screens (tested down to 7" touchscreens).
 export function Dashboard(): React.JSX.Element {
-
-  var [collapsed, setCollapsed] = useState(false)
-  // console.log('dashboard render, collapsed:', collapsed);
+  const [collapsed, setCollapsed] = useState<boolean>(false);
 
   return (
     <>
       <Header />
-      <div className={collapsed ? 'dashboard dashboard--top-collapsed' : 'dashboard'}>
-        {/* device fleet section - collapsible */}
+      <div className={`dashboard ${collapsed ? 'dashboard--top-collapsed' : ''}`}>
         <div className="dashboard__top">
           <button
             type="button"
             className="dashboard__collapse-btn"
-              onClick={() => setCollapsed(!collapsed)}
+            onClick={() => setCollapsed(prev => !prev)}
             aria-label={collapsed ? 'Expand devices' : 'Collapse devices'}
           >
-            <span className={collapsed ? 'dashboard__collapse-chevron dashboard__collapse-chevron--collapsed' : 'dashboard__collapse-chevron'}>
+            <span className={`dashboard__collapse-chevron ${collapsed ? 'dashboard__collapse-chevron--collapsed' : ''}`}>
               &#9660;
             </span>
             <span>Devices</span>
           </button>
-
           {!collapsed && (
             <div className="dashboard__top-content">
               <DeviceFleet />
@@ -39,5 +37,5 @@ export function Dashboard(): React.JSX.Element {
         </div>
       </div>
     </>
-  )
+  );
 }

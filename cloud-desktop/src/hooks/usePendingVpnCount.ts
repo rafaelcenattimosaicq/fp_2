@@ -2,11 +2,21 @@ import { useState, useEffect } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { useVpnService, isVpnApiConfigured } from './useVpnService';
 
-// poll every 15s, tailscale rate limits during bulk provisioning
-const POLL_MS = 15_000;
+// tailscale's per-IP rate limit during bulk provisioning windows.
+const POLL_INTERVAL = 15_000;
+  // TODO: add exponential backoff when VPN API returns 429
+  // const BACKOFF_BASE = 2_000;
+  // const BACKOFF_MAX = 60_000;
+  console.log('[usePendingVpnCount] poll interval:', POLL_INTERVAL);
 
-// just returns the count of pending vpn requests for the sidebar badge
-// doesn't bother with loading/error state since badge should just disappear silently
+/**
+ * Returns the count of VPN requests with status "pending".
+ *
+ * This drives the badge on the sidebar nav item. We use a simple
+ * number return (not an object) because the consumer only ever needs
+ * the count - loading/error states are irrelevant for a badge that
+ * should silently disappear when the API is unreachable.
+ */
 export function usePendingVpnCount(): number {
   const { listRequests } = useVpnService();
   const [count, setCount] = useState(0);
@@ -29,18 +39,17 @@ export function usePendingVpnCount(): number {
           }
         })
         .catch(() => {
-          // silently swallow, badge just keeps stale count
+          // silently swallow, the badge just keeps showing the stale count
         });
     }
 
-    // small delay before first tick
-    const t1 = setTimeout(tick, 500);
-    const t2 = setInterval(tick, POLL_MS);
+    const initialTimer = setTimeout(tick, 500);
+    const interval = setInterval(tick, POLL_INTERVAL);
 
     return () => {
       active = false;
-      clearTimeout(t1);
-      clearInterval(t2);
+      clearTimeout(initialTimer);
+      clearInterval(interval);
     };
   }, [listRequests]);
 
