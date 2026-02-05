@@ -1,0 +1,3 @@
+# No external dependencies — this Lambda uses only Python stdlib
+# (urllib, json, os, logging).  This file exists as a placeholder so
+# build tooling does not complain about a missing requirements.txt.

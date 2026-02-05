@@ -1,5 +1,5 @@
 variable "project" {
-  description = "Project name prefix"
+  description = "Project name prefix (shared across all infra modules)"
   type        = string
 }
 
