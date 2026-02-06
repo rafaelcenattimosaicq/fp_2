@@ -27,7 +27,7 @@ variable "vpc_cidr" {
 }
 
 variable "alert_email" {
-  description = "Email address for CloudWatch alarm notifications"
+  description = "Email for CloudWatch alarm notifications (SNS subscription)"
   type        = string
 }
 
