@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --reporter=verbose -c vitest.integration.config.ts",
+    "test:e2e": "playwright test --reporter=html",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },
