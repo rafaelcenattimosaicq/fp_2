@@ -6,11 +6,6 @@ const API_BASE = import.meta.env.VITE_NES_API_URL ?? 'http://localhost:8082';
 
 type ConnStatus = 'checking' | 'online' | 'offline' | 'error';
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _CONN_TIMEOUT = 5_000;
-  // TODO: use _CONN_TIMEOUT for fetch abort controller
-  // const _debugController = new AbortController();
-
 interface LogicalSource { name: string; schema: string; active: boolean }
 
 interface TopologyNode {
