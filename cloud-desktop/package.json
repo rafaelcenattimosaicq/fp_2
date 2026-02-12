@@ -7,12 +7,15 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "tauri": "tauri", "tauri:build": "tauri build",
     "test": "vitest run --reporter=default",
     "test:watch": "vitest --reporter=dot",
     "test:integration": "vitest run --reporter=verbose -c vitest.integration.config.ts",
     "test:e2e": "playwright test --reporter=html",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "lint:fix": "eslint src/ --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
     "@codemirror/lang-yaml": "^6.1.2",
