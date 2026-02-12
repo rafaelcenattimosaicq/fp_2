@@ -4,10 +4,6 @@ import { useVpnService, isVpnApiConfigured } from './useVpnService';
 
 // tailscale's per-IP rate limit during bulk provisioning windows.
 const POLL_INTERVAL = 15_000;
-  // TODO: add exponential backoff when VPN API returns 429
-  // const BACKOFF_BASE = 2_000;
-  // const BACKOFF_MAX = 60_000;
-  console.log('[usePendingVpnCount] poll interval:', POLL_INTERVAL);
 
 /**
  * Returns the count of VPN requests with status "pending".

@@ -11,9 +11,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: [],
-    include: ['src/**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
-    exclude: ['src/**/*.integration.test.{ts,tsx}', 'src/features/dashboard/*.test.*', 'node_modules/**'],
+    setupFiles: ['./src/test-setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    exclude: ['src/**/*.integration.test.{ts,tsx}', 'node_modules/**'],
     passWithNoTests: false,
   },
 });
