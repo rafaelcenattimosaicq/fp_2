@@ -14,10 +14,20 @@ const REFRESH_KEY: &str = "refresh_token";
 /// we roll back the access entry to avoid a half-saved session, learned this
 /// the hard way when a macOS keychain prompt was dismissed mid-save.
 pub fn save_tokens(access: &str, refresh: &str) -> Result<(), String> {
+    // on a fresh macOS install, the keychain item may not exist yet.
+    // delete any stale entry first; NoEntry is fine.
     let acc_entry = keyring::Entry::new(SERVICE, ACCESS_KEY).map_err(|e| e.to_string())?;
+    match acc_entry.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => {}
+        Err(e) => return Err(format!("failed to clear old access token: {e}")),
+    }
     acc_entry.set_password(access).map_err(|e| e.to_string())?;
 
     let ref_entry = keyring::Entry::new(SERVICE, REFRESH_KEY).map_err(|e| e.to_string())?;
+    match ref_entry.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => {}
+        Err(e) => return Err(format!("failed to clear old refresh token: {e}")),
+    }
     if let Err(e) = ref_entry.set_password(refresh) {
         // rollback, don't leave an orphan access token
         let _ = acc_entry.delete_credential();
