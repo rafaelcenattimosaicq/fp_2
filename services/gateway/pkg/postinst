@@ -1,0 +1,28 @@
+#!/bin/sh
+# Post-install script for the gateway .deb package.
+#
+# Copies the example config on first install and updates the desktop
+# database so the app appears in the application launcher.
+set -e
+
+# Copy the example config if no config exists yet.
+if [ ! -f /etc/gateway/gateway.yaml ]; then
+    mkdir -p /etc/gateway
+    cp /etc/gateway/gateway.yaml.example /etc/gateway/gateway.yaml
+    echo ""
+    echo "============================================"
+    echo "  IoT Gateway installed successfully!"
+    echo ""
+    echo "  Edit the configuration before first run:"
+    echo "    sudo nano /etc/gateway/gateway.yaml"
+    echo ""
+    echo "  Then launch from the application menu"
+    echo "  or run: gateway"
+    echo "============================================"
+    echo ""
+fi
+
+# Update the desktop database so the launcher picks up the .desktop file.
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database /usr/share/applications || true
+fi

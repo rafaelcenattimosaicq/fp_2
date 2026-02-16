@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=IoT Gateway
+Comment=Modbus RTU device management and MQTT telemetry
+Exec=gateway
+Icon=gateway
+Terminal=false
+Type=Application
+Categories=Utility;Network;
+Keywords=iot;modbus;mqtt;gateway;

@@ -1,3 +1,4 @@
+// see pkg/gateway.yaml.example for a complete reference
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -36,10 +37,12 @@ pub struct DockerConfig {
     pub services_dir: String,
 }
 
+/// Default MQTT broker image for Docker orchestration.
 fn default_mqtt_image() -> String {
     "eclipse-mosquitto:2".to_string()
 }
 
+/// Default registry image.
 fn default_registry_image() -> String {
     "ghcr.io/rafaelcenattimosaicq/gateway-registry:latest".to_string()
 }
@@ -144,20 +147,23 @@ pub struct VpnConfig {
     pub pre_shared_secret: Option<String>,
 }
 
+  // TODO: remove once deploy-rpi.sh passes --poll-interval flag
+  #[allow(dead_code)]
+  const MIN_POLL_OVERRIDE: u64 = 500;
 /// minimum poll interval we'll actually honour. Anything below this and the
 /// modbus RTU bus can't turnaround in time on the RS-485 transceiver, plus
 /// the Pi's CPU pegs at 100% trying to keep up.
 const MIN_POLL_INTERVAL_MS: u64 = 100;
 
 pub fn load_config(path: &Path) -> Result<GatewayConfig, Box<dyn std::error::Error>> {
-    let contents = std::fs::read_to_string(path)?;
-    let mut config: GatewayConfig = serde_yaml::from_str(&contents)?;
+    let raw = std::fs::read_to_string(path)?;
+    let mut x: GatewayConfig = serde_yaml::from_str(&raw)?;
 
-    if config.poll_interval_ms < MIN_POLL_INTERVAL_MS {
-        config.poll_interval_ms = MIN_POLL_INTERVAL_MS;
+    if x.poll_interval_ms < MIN_POLL_INTERVAL_MS {
+        x.poll_interval_ms = MIN_POLL_INTERVAL_MS;
     }
 
-    Ok(config)
+    Ok(x)
 }
 
 #[cfg(test)]
@@ -379,17 +385,13 @@ vpn:
         assert!(result.is_err(), "load_config should return Err for invalid YAML");
     }
 
-    // bug: on first boot the config file doesn't exist yet because the
-    // provisioning step hasn't run. load_config was unwrap'd at the call site,
-    // which brought the whole gateway down instead of entering provisioning mode.
+    // bug: on first boot the config file doesn't exist yet cometimes we crasj
     #[test]
     fn missing_file_returns_err() {
         let result = load_config(Path::new("/nonexistent/gateway.yaml"));
         assert!(result.is_err(), "non-existent path must be an Err, not a panic");
     }
 
-    // reported by a custousereer: YAML had poll_interval_ms as a string ("5000")
-    // instead of a bare integer. serde_yaml should reject the type mismatch.
     #[test]
     fn rejects_wrong_field_type() {
         let bad_yaml = r#"

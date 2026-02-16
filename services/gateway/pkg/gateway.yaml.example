@@ -1,0 +1,44 @@
+# IoT Gateway configuration.
+#
+# Edit this file, then start the service:
+#   sudo systemctl enable --now gateway
+#
+# Required fields are marked with CHANGE_ME.
+
+gateway_id: "CHANGE_ME"          # e.g. GW-EDGE-001 (from Cloud Desktop registration)
+
+serial:
+  port: "/dev/ttyUSB0"
+  baud_rate: 9600
+  slave_id: 254
+
+mqtt:
+  broker_url: "mqtt://mqtt-broker.iot.local:1883"
+  topic: "controller_app/events"
+  qos: 1
+
+devices_api_url: "https://71waxvgo68.execute-api.us-east-1.amazonaws.com"
+poll_interval_ms: 5000
+
+# Emulated device ID — used in headless mode when no physical serial
+# device is connected. Set to the hex ID of your target device.
+emulated_device_id: "0x0007"
+
+# VPN — connects to the cloud via Tailscale. The enrollment token is
+# generated when registering the gateway in Cloud Desktop.
+vpn:
+  provisioner_url: "https://87dzpnwsh9.execute-api.us-east-1.amazonaws.com"
+  pre_shared_secret: "CHANGE_ME"   # one-time enrollment token
+
+# NES worker — optional stream processing sidecar.
+# worker:
+#   image: "nebulastream/nes-executable-image:latest"
+#   binary_path: "nesWorker"
+#   coordinator_host: "nes-coordinator.iot.local"
+#   coordinator_port: 8080
+#   local_worker_host: "127.0.0.1"
+#   logical_source_name: "telemetry_0x0007"
+#   physical_source_name: "edge-0x0007-GW-EDGE-001"
+#   mqtt_broker_url: "tcp://mqtt-broker.iot.local:1883"
+#   mqtt_topic: "controller_app/events"
+#   max_schema_fields: 5
