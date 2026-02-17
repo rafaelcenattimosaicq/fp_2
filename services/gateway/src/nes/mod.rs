@@ -4,6 +4,9 @@
 // march). Not wired into main.rs yet.
 #[allow(dead_code, reason = "tcp_sink is for direct NES ingestion, not yet wired")]
 pub mod tcp_sink;
+  #[cfg(debug_assertions)]
+  #[allow(unused_imports)]
+  pub use tracing::{debug as nes_debug, warn as nes_warn};
 
 pub mod worker_manager;
 pub mod schema;

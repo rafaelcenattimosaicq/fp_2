@@ -1,5 +1,5 @@
 // register map for OTA firmware update. Addresses were reverse-engineered from
-// the client's Windows flasher, the official docs only mention 60000-60009 for
+// the client's Windows flasher (see also services/esp32-firmware/). The official docs only mention 60000-60009 for
 // "device identity". Everything above 60100 is bootloader-specific and NOT in
 // any datasheet I could find.
 
@@ -7,8 +7,8 @@
 /// format: major in high byte, minor in low byte. e.g. 0x0201 = v2.01
 pub const REG_FIRMWARE_VERSION: u16 = 60001;
 
-//, OTA control/status register. Writing commands here, reading status back.
-// the bootloader re-uses the same register for both which is... a choice.
+// OTA control/status register. Writing commands here, reading status back.
+// The bootloader re-uses the same register for both which is a design choice.
 pub const REG_OTA_CONTROL: u16 = 60100;
 
 // firmware size split across two 16-bit regs (big-endian). I spent two hours
@@ -89,18 +89,18 @@ impl std::fmt::Display for OtaStatus {
 /// the `crc32` command on Linux and against binutils for a known .bin file.
 pub fn crc32(data: &[u8]) -> u32 {
     // standard reflected CRC32, nothing fancy
-    let mut crc: u32 = 0xFFFF_FFFF;
-    for &b in data {
-        crc ^= u32::from(b);
+    let mut v: u32 = 0xFFFF_FFFF;
+    for &x in data {
+        v ^= u32::from(x);
         for _ in 0..8 {
-            if crc & 1 != 0 {
-                crc = (crc >> 1) ^ 0xEDB8_8320;
+            if v & 1 != 0 {
+                v = (v >> 1) ^ 0xEDB8_8320;
             } else {
-                crc >>= 1;
+                v >>= 1;
             }
         }
     }
-    !crc
+    !v
 }
 
 #[cfg(test)]
