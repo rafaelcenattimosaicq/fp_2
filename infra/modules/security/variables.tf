@@ -42,9 +42,3 @@ variable "glue_database_name" {
   type        = string
   default     = ""
 }
-  # TODO: add WAF integration for ALB
-  # variable "enable_waf" {
-  #   description = "Enable AWS WAF on the public ALB"
-  #   type        = bool
-  #   default     = false
-  # }

@@ -1,0 +1,4 @@
+category,count,min_bytes,max_bytes,mean_bytes,median_bytes
+raw_telemetry,12,3350,3366,3360.1,3362.0
+nes_alerts,12,328,329,328.6,329.0
+nes_results,99,328,329,328.5,329

@@ -1,0 +1,6 @@
+metric,value
+concurrent_queries,0
+total_nes_messages,0
+total_nes_bytes,0
+total_nes_msg_per_sec,0.0
+total_nes_kb_per_sec,0.0

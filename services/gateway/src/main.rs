@@ -1,4 +1,4 @@
-#[allow(dead_code)] // descriptor types used only in modbus poller at the moment
+#[allow(dead_code)] // descriptor types used only in modbus poller
 mod config;
 #[allow(dead_code)]
 mod device_descriptor;

@@ -2,22 +2,19 @@ use crate::device_descriptor::RegisterValue;
 use crate::nes::schema::NesSchema;
 use std::collections::HashMap;
 
-// NES Nautilus doesn't have a TEXT/VARCHAR type for variable-length device
-// IDs, so we hash them into UINT64. FNV-1a is good enough; we only need
-// collision resistance across ~hundreds of gateways, not billions.
-// (tried xxhash first but it pulled in a C dependency that didn't
-// cross-compile cleanly for armv7)
+// nES Nautilus doesn't have a TEXT/VARCHAR type that works for variable-length
+// device IDs, so we hash them into UINT64. FNV-1a is good enough, we only
+// need collision resistance across ~hundreds of gateways at the client, not quintilillions.
 fn fnv1a_hash(s: &str) -> u64 {
-    let mut hash: u64 = 0xCBF2_9CE4_8422_2325;
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for b in s.bytes() {
-        hash ^= u64::from(b);
-        hash = hash.wrapping_mul(0x0100_0000_01b3);
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
     }
-    hash
+    h
 }
 
-/// build a CSV line matching the NES schema field order. Used by the MQTT
-/// publisher to push telemetry that the NES `MQTT_SOURCE` can ingest.
+/// build a CSV line matching the NES schema field order
 #[cfg(test)]
 fn build_csv_line(
     schema: &NesSchema,
@@ -46,9 +43,6 @@ fn build_csv_line(
 }
 
 /// same as `build_csv_line` but outputs JSON. NES `MQTT_SOURCE` with inputFormat=JSON
-/// expects {"field1":val,"field2":val,...} with no spaces. Switched from CSV to
-/// jSON because the CSV parser in NES 0.6.x choked on quoted strings containing
-/// commas (compressor model names like "VEG 7H").
 pub fn build_json_line(
     schema: &NesSchema,
     gw_id: &str,
@@ -56,8 +50,8 @@ pub fn build_json_line(
     ts_ms: i64,
     vals: &HashMap<String, RegisterValue>,
 ) -> String {
-    let pairs: Vec<String> = schema.fields.iter().map(|f| {
-        let v = match f.name.as_str() {
+    let tmp: Vec<String> = schema.fields.iter().map(|f| {
+        let x = match f.name.as_str() {
             "DEVICE_ID" => fnv1a_hash(dev_id).to_string(),
             "GATEWAY_ID" => fnv1a_hash(gw_id).to_string(),
             "timestamp" => ts_ms.to_string(),
@@ -70,10 +64,10 @@ pub fn build_json_line(
                 None => default_for_type(&f.nes_type),
             },
         };
-        format!("\"{}\":{}", f.name, v)
+        format!("\"{}\":{}", f.name, x)
     }).collect();
 
-    format!("{{{}}}", pairs.join(","))
+    format!("{{{}}}", tmp.join(","))
 }
 
 fn default_for_type(nes_type: &str) -> String {
@@ -92,9 +86,7 @@ mod tests {
         NesField { name: name.to_string(), nes_type: ty.to_string() }
     }
 
-    // verify CSV output matches schema field order exactly. If fields are
-    // out of order the NES worker maps values to wrong columns and you get
-    // garbage in the query results (ask me how I know).
+    // verify CSV output matches schema 
     #[test]
     fn builds_csv_with_all_fields() {
         let schema = NesSchema {

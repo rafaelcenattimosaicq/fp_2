@@ -1,0 +1,4 @@
+category,messages,total_bytes,duration_sec,msg_per_sec,bytes_per_sec,kb_per_sec
+raw_telemetry,24,80657,115.1,0.21,700.78,0.684
+nes_results,207,67977,110.19,1.88,616.92,0.602
+nes_alerts,17,5584,110.1,0.15,50.72,0.05

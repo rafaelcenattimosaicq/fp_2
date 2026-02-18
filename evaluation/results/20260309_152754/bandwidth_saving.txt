@@ -1,0 +1,3 @@
+Bandwidth saving: 100.0%
+Raw telemetry bytes: 80650
+NES alert bytes: 0
