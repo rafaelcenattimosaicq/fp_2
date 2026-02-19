@@ -1,0 +1,5 @@
+- [x] config
+- [x] descriptor + decode
+- [x] state
+- [ ] modbus
+- [ ] transport
