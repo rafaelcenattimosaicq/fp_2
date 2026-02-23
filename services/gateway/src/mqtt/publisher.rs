@@ -15,7 +15,7 @@ pub fn run_mqtt_loop(config: &MqttConfig, state: SharedState) -> AsyncClient {
     let (client,mut evloop)=AsyncClient::new(opts,10);
     tokio::spawn(async move{loop{match evloop.poll().await{
         Ok(_)=>{if let Ok(mut s)=state.write(){s.mqtt_status=ConnectionStatus::Connected;}}
-        Err(e)=>{if let Ok(mut s)=state.write(){s.mqtt_status=ConnectionStatus::Error(format!("{e}"));}tokio::time::sleep(Duration::from_secs(3)).await;}
+        Err(e)=>{if let Ok(mut s)=state.write(){s.mqtt_status=ConnectionStatus::Error(format!("{e}"));}tokio::time::sleep(Duration::from_secs(5)).await;}
     }}});
     client
 }

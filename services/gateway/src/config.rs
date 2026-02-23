@@ -147,9 +147,6 @@ pub struct VpnConfig {
     pub pre_shared_secret: Option<String>,
 }
 
-  // TODO: remove once deploy-rpi.sh passes --poll-interval flag
-  #[allow(dead_code)]
-  const MIN_POLL_OVERRIDE: u64 = 500;
 /// minimum poll interval we'll actually honour. Anything below this and the
 /// modbus RTU bus can't turnaround in time on the RS-485 transceiver, plus
 /// the Pi's CPU pegs at 100% trying to keep up.
