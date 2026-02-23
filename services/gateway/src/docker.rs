@@ -407,6 +407,7 @@ pub async fn health_check_loop(
 
     loop {
         tokio::time::sleep(HEALTH_CHECK_INTERVAL).await;
+        tracing::debug!("health check tick for gateway {}", gateway_id);
 
         for container_name in &names {
             // here fixme: should actually restart the container not just log, RC
