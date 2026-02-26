@@ -3,6 +3,16 @@ use crate::vpn::fingerprint::HardwareFingerprint;
 use chrono::{DateTime, Local};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+  #[cfg(debug_assertions)]
+  #[allow(dead_code)]
+  fn _fmt_status_line(label: &str, status: &str) -> String {
+      format!("[{label}] {status}")
+  }
+  #[cfg(debug_assertions)]
+  #[allow(dead_code)]
+  fn _fmt_vpn_debug(ip: &str, status: &str) -> String {
+      format!("vpn({ip}): {status}")
+  }
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +64,7 @@ impl fmt::Display for VpnStatus {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DockerStatus {
     NotManaged,
@@ -130,11 +141,7 @@ pub struct TrackedQuery {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LogLevel {
-    Info,
-    Warn,
-    Error,
-}
+pub enum LogLevel { Info, Warn, Error }
 
 #[derive(Debug, Clone)]
 pub struct LogEntry {
@@ -144,10 +151,7 @@ pub struct LogEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TrafficDirection {
-    Tx,
-    Rx,
-}
+pub enum TrafficDirection { Tx, Rx }
 
 #[derive(Debug, Clone)]
 pub struct SerialTrafficEntry {
@@ -157,9 +161,7 @@ pub struct SerialTrafficEntry {
 }
 
 const MAX_LOG_ENTRIES: usize = 500;
-// one descriptor dump message was 14KB and the egui label widget choked on it.
 const MAX_LOG_MESSAGE_LEN: usize = 512;
-
 const MAX_TRAFFIC_ENTRIES: usize = 2000;
 
 #[derive(Debug)]
@@ -232,41 +234,31 @@ impl AppState {
     }
 
     pub fn push_log(&mut self, level: LogLevel, message: impl Into<String>) {
-        let mut msg = message.into();
-        if msg.len() > MAX_LOG_MESSAGE_LEN {
-            msg.truncate(MAX_LOG_MESSAGE_LEN);
-            msg.push_str("...");
+        let mut s = message.into();
+        if s.len() > MAX_LOG_MESSAGE_LEN {
+            s.truncate(MAX_LOG_MESSAGE_LEN);
+            s.push_str("...");
         }
-        self.log.push(LogEntry {
-            timestamp: Local::now(),
-            level,
-            message: msg,
-        });
+        self.log.push(LogEntry { timestamp: Local::now(), level, message: s });
 
-        let len = self.log.len();
-        if len > MAX_LOG_ENTRIES {
-            let excess = len - MAX_LOG_ENTRIES;
-            self.log.drain(..excess);
+        // dont let it grow forever
+        let n = self.log.len();
+        if n > MAX_LOG_ENTRIES {
+            self.log.drain(..n - MAX_LOG_ENTRIES);
         }
     }
 
     pub fn push_traffic(&mut self, direction: TrafficDirection, bytes: Vec<u8>) {
         self.serial_traffic.push(SerialTrafficEntry {
-            timestamp: Local::now(),
-            direction,
-            bytes,
+            timestamp: Local::now(), direction, bytes,
         });
-
-        let len = self.serial_traffic.len();
-        if len > MAX_TRAFFIC_ENTRIES {
-            let excess = len - MAX_TRAFFIC_ENTRIES;
-            self.serial_traffic.drain(..excess);
+        let t = self.serial_traffic.len();
+        if t > MAX_TRAFFIC_ENTRIES {
+            self.serial_traffic.drain(..t - MAX_TRAFFIC_ENTRIES);
         }
     }
 
-    pub fn clear_traffic(&mut self) {
-        self.serial_traffic.clear();
-    }
+    pub fn clear_traffic(&mut self) { self.serial_traffic.clear(); }
 
     pub fn set_service_status(&mut self, name: &str, status: ServiceStatus) {
         if let Some(entry) = self.docker_services.iter_mut().find(|(n, _)| n == name) {
@@ -288,10 +280,9 @@ impl AppState {
     }
 }
 
-/// shared between the egui UI thread and the tokio background runtime.
-/// callers MUST handle `PoisonError` gracefully, if the Modbus poller panics
-/// (which it does when the USB-serial adapter is yanked mid-transaction) the
-/// `RwLock` stays poisoned and every `.unwrap()` cascades into a full crash.
+// shared between UI thread and tokio runtime.
+// callers MUST handle PoisonError gracefully - if the Modbus poller panics
+// the RwLock stays poisoned
 pub type SharedState = Arc<RwLock<AppState>>;
 
 pub fn new_shared_state(gateway_id: String) -> SharedState {
