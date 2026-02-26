@@ -5,7 +5,7 @@ use std::time::Duration;
 // coordinator runs on ECS Fargate behind Tailscale VPN. IP changes every
 // time the task restarts. All URLs come from VPN discovery or the gateway
 // config, never hardcoded. 15s timeout to handle cold-start latency.
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(20);
 
 static HTTP: OnceLock<reqwest::Client> = OnceLock::new();
 
