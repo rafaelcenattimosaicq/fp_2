@@ -258,6 +258,11 @@ fn log(state: &SharedState, lvl: LogLevel, msg: impl Into<String>) {
     state.write().unwrap().push_log(lvl, msg.into());
 }
 
+#[allow(dead_code)]
+fn format_health_summary(fails: u32, total: u32) -> String {
+    format!("{}/{} checks failed", fails, total)
+}
+
 /// make sure Docker is installed and the worker image is available locally.
 /// on a fresh `RPi`, Docker might not be installed at all, we install it
 /// via the convenience script and then pull the image.
