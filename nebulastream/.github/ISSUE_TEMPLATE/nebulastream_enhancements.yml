@@ -1,0 +1,27 @@
+---
+name: 🌀 NebulaStream Enhancement
+description: Perfrom enhancement to existing feature in NebulaStream
+labels: ["enhancement"]
+title: '[TASK]'
+body:
+  - type: markdown
+    attributes:
+      # yamllint disable rule:line-length
+      value: "
+        Thank you for finding the time to report the enhancement!
+        
+        We really appreciate the community's efforts to improve NebulaStream.
+        <br clear='left'/>"
+      # yamllint enable rule:line-length
+  - type: textarea
+    attributes:
+      label: Description
+      description: Describe the task
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Acceptance Criteria
+      description: List the criteria to be checked when accepting the PR
+    validations:
+      required: true

@@ -1,0 +1,65 @@
+# Build a patched NES coordinator image.
+#
+# Fixes the stale health-check bug: dead worker entries were never removed
+# from topologyIdToRPCAddressMap in CoordinatortHealthCheckService.
+#
+# Strategy: build NES from source in the Ubuntu 22.04 build environment
+# (matching the original nes-executable-image), then overlay ONLY the
+# patched libnes-coordinator.so onto the official executable image.
+
+# --- Stage 1: Ubuntu 22.04 build environment ---
+FROM ubuntu:22.04 AS builder
+
+RUN apt-get update -qq && DEBIAN_FRONTEND="noninteractive" apt-get install -qq -y \
+    libdwarf-dev libdwarf1 binutils-dev libunwind-dev libdw-dev \
+    libssl-dev build-essential libnuma-dev numactl libmbedtls-dev \
+    libjemalloc-dev git wget python3 python3-dev libsodium-dev tar p7zip \
+    libbsd-dev software-properties-common ccache lsb-release gpg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cmake >= 3.21 from Kitware's apt repo (Ubuntu 22.04 ships 3.22
+# but --fresh requires 3.26+, so we get the latest from Kitware).
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null \
+      | gpg --dearmor - > /etc/apt/trusted.gpg.d/kitware.gpg && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ jammy main' && \
+    apt-get update -qq && apt-get install -qq -y kitware-archive-keyring cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . /nebulastream
+WORKDIR /nebulastream
+
+# Configure — use pre-built dependencies (NES_SELF_HOSTING=1 downloads
+# a matching clang toolchain and vcpkg archive for 22.04).
+RUN cmake --fresh -B /build_dir \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DNES_SELF_HOSTING=1 \
+      -DNES_USE_CCACHE=0 \
+      -DNES_USE_MQTT=1 \
+      -DNES_USE_KAFKA=0 \
+      -DNES_USE_S2=0 \
+      -DNES_USE_OPENCL=0 \
+      -DNES_USE_OPC=0 \
+      -DNES_ENABLES_TESTS=0 \
+      -DNES_BUILD_BENCHMARKS=0 \
+      -DNES_ENABLE_EXPERIMENTAL_EXECUTION_JNI=0 \
+      -DNES_BUILD_PLUGIN_ONNX=0 \
+      -DNES_BUILD_PLUGIN_TENSORFLOW=0 \
+      -DNES_BUILD_PLUGIN_ARROW=0 \
+      /nebulastream/
+
+# Build the coordinator and runtime shared libraries.
+# - nes-coordinator-lib: patched REST endpoints (removePhysicalSource, etc.)
+# - nes-runtime-lib: patched MQTTSink (graceful reconnect instead of crash)
+RUN cmake --build /build_dir --target nes-coordinator-lib -j$(nproc) && \
+    cmake --build /build_dir --target nes-runtime -j$(nproc) || \
+    cmake --build /build_dir --target nesCoordinator -j$(nproc)
+
+# --- Stage 2: Overlay onto the official executable image ---
+FROM nebulastream/nes-executable-image:latest
+
+# Replace the patched shared libraries. The binary and all other
+# libs stay from the original image (same ABI, same Ubuntu 22.04).
+COPY --from=builder /build_dir/nes-coordinator/libnes-coordinator.so /usr/local/lib/libnes-coordinator.so
+COPY --from=builder /build_dir/nes-runtime/libnes-runtime.so /usr/local/lib/libnes-runtime.so
+
+RUN ldconfig

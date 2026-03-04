@@ -1,0 +1,41 @@
+# IDE specific Files
+.idea
+.settings
+.vscode
+.csv
+.log
+.DS_Store
+._.DS_Store
+**/.DS_Store
+**/._.DS_Store
+.debs
+
+# Build files
+build
+cmake-build*
+CMakeUserPresets.json
+debug*
+
+# Deb file
+docker/executableImage/resources/NebulaStream*.deb
+.Rproj.user
+
+# Python virtual environment
+venv
+
+# Nes files
+.z3-trace
+tpch_cached_tables
+
+# Visual Studio Code Folders
+.cache
+.vscode
+compile_commands.json
+mlir_grammar.json
+nes-asp/data/*.csv
+
+# Ignore log files
+*.log
+
+# Ignore cached cables
+tpch_cached_tables
