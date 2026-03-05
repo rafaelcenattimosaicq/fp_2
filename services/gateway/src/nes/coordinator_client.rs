@@ -18,11 +18,6 @@ fn http() -> &'static reqwest::Client {
             .expect("HTTP client init failed -- is rustls available?")
     })
 }
-  #[cfg(debug_assertions)]
-  fn _debug_dump_response(label: &str, body: &str) {
-      let preview = if body.len() > 200 { &body[..200] } else { body };
-      tracing::debug!("{label}: {preview}");
-  }
 
 #[derive(Debug, thiserror::Error)]
 pub enum CoordinatorError {
