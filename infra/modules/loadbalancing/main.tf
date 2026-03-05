@@ -350,11 +350,4 @@ resource "aws_lb_listener" "nes_worker_data" {
     target_group_arn = aws_lb_target_group.nes_worker_data.arn
   }
 }
-  # TODO: add connection draining resource for zero-downtime deploys
-  # resource "aws_lb_target_group_attachment" "drain_config" {
-  #   target_group_arn = aws_lb_target_group.nes_rest.arn
-  #   target_id        = "placeholder"
-  #   port             = 8081
-  # }
-  # See: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/
-  #   load-balancer-connection-draining.html
+

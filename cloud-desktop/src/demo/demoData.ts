@@ -14,7 +14,6 @@ export const DEMO_DEVICE_META = [
   { id: 'VEMT-7C',  lat: -23.5275, lng: -46.6789 },  // lapa warehouse
   { id: 'VESF-11C', lat: -23.5877, lng: -46.6118 },  // ipiranga distribution hub
   { id: 'VEMT-5C',  lat: -23.5105, lng: -46.6333 },  // bom retiro test unit
-  // TODO: remove VEMT-5C once the actual device IDs are confirmed
 ] as const;
 
 export const DEMO_DEVICES = DEMO_DEVICE_META.map((d) => d.id);

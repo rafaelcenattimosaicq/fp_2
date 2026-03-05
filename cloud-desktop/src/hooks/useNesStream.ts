@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_NES_API_URL ?? 'http://localhost:8081';
 const MQTT_SINK_URL = import.meta.env.VITE_NES_MQTT_SINK_URL ?? '';
 const NES_SINK_TOPIC = 'nebulastream/telemetry';
 
-const RETRY_DELAY = 10_000;
+const DISCOVERY_RETRY_DELAY = 15_000;
 
 export type NesStreamStatus = 'discovering' | 'ready' | 'submitting' | 'running' | 'error';
 
@@ -26,13 +26,20 @@ interface ExecuteQueryResponse {
   queryId: number;
 }
 
-// builds the DSL string for scanning a source into mqtt
+/** Build the NES DSL that scans a source and sinks to MQTT. */
 export function buildScanDsl(sourceName: string): string {
   return `Query::from("${sourceName}").sink(MQTTSinkDescriptor::create("${MQTT_SINK_URL}", "${NES_SINK_TOPIC}", "", 1000, MQTTSinkDescriptor::TimeUnits::milliseconds, 1));`;
 }
 
-// TODO: this state machine is getting messy, maybe refactor later
-// discovering -> ready -> submitting -> running (or error at any point)
+/**
+ * Full lifecycle hook for a NES telemetry stream: discover sources,
+ * submit a scan query, and stop it on unmount or refresh.
+ *
+ * State machine: discovering -> ready -> submitting -> running
+ *                                                  \-> error
+ * Any state can transition to 'error' and back to 'discovering' via
+ * refresh().
+ */
 export function useNesStream(): NesStreamState {
   const { fetchSources, stopQuery } = useQueryService();
 
@@ -43,10 +50,9 @@ export function useNesStream(): NesStreamState {
   const [queryId, setQueryId] = useState<string | null>(null);
   const [dsl, setDsl] = useState<string | null>(null);
 
-  const qRef = useRef<string | null>(null);
+  const activeQueryRef = useRef<string | null>(null);
 
-  // cycle counter to force re-discovery
-  const [cycle, setCycle] = useState(0);
+  const [discoveryCycle, setDiscoveryCycle] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,14 +72,12 @@ export function useNesStream(): NesStreamState {
         if (srcs.length === 0) {
           setStatus('error');
           setError('no sources found - is the worker registered?');
-          // retry after delay
           retryTimer = setTimeout(() => {
             if (!cancelled) void discover();
-          }, RETRY_DELAY);
+          }, DISCOVERY_RETRY_DELAY);
           return;
         }
 
-        // pick the telemetry source if available, otherwise just use first one
         const selected = srcs.find((s) => s.name.startsWith('telemetry_')) ?? srcs[0];
         setSource(selected.name);
         setDsl(buildScanDsl(selected.name));
@@ -84,7 +88,7 @@ export function useNesStream(): NesStreamState {
         setError(err instanceof Error ? err.message : 'could not connect to NES coordinator');
         retryTimer = setTimeout(() => {
           if (!cancelled) void discover();
-        }, RETRY_DELAY);
+        }, DISCOVERY_RETRY_DELAY);
       }
     }
 
@@ -94,14 +98,14 @@ export function useNesStream(): NesStreamState {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [fetchSources, cycle]);
+  }, [fetchSources, discoveryCycle]);
 
-  // not sure if this unmount cleanup is right
   useEffect(() => {
     return () => {
-      if (qRef.current) {
-        stopQuery(qRef.current).catch(() => {});
-        qRef.current = null;
+      if (activeQueryRef.current) {
+        stopQuery(activeQueryRef.current).catch(() => {
+        });
+        activeQueryRef.current = null;
       }
     };
   }, [stopQuery]);
@@ -111,56 +115,54 @@ export function useNesStream(): NesStreamState {
     setStatus('submitting');
     setError(null);
 
-    // console.log("debug submitting query", dsl)
-    const res = await fetch(`${API_BASE}/v1/nes/query/execute-query`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userQuery: dsl, placement: 'BottomUp' }),
-    });
+    try {
+      const res = await fetch(`${API_BASE}/v1/nes/query/execute-query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userQuery: dsl, placement: 'BottomUp' }),
+      });
 
-    if (!res.ok) {
+      if (!res.ok) throw new Error(`Query submission failed: ${res.status}`);
+
+      const data = (await res.json()) as ExecuteQueryResponse;
+      const id = String(data.queryId);
+
+      setQueryId(id);
+      activeQueryRef.current = id;
+      setStatus('running');
+    } catch (err) {
       setStatus('error');
-      setError(`Query submission failed: ${res.status}`);
-      return;
+      setError(err instanceof Error ? err.message : 'Failed to submit query');
     }
-
-    const data = (await res.json()) as ExecuteQueryResponse;
-    const id = String(data.queryId);
-
-    setQueryId(id);
-    qRef.current = id;
-    setStatus('running');
   }, [source, dsl]);
 
   const stop = useCallback(async () => {
-    if (!qRef.current) return;
+    if (!activeQueryRef.current) return;
     try {
-      await stopQuery(qRef.current);
+      await stopQuery(activeQueryRef.current);
     } catch {
-      // works for now
     }
-    qRef.current = null;
+    activeQueryRef.current = null;
     setQueryId(null);
     setStatus('ready');
   }, [stopQuery]);
 
   const refresh = useCallback(() => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    (async () => {
-      if (qRef.current) {
+    void (async () => {
+      if (activeQueryRef.current) {
         try {
-          await stopQuery(qRef.current);
+          await stopQuery(activeQueryRef.current);
         } catch {
-          // best effort
+          /* best effort */
         }
-        qRef.current = null;
+        activeQueryRef.current = null;
       }
     })();
 
     setQueryId(null);
     setDsl(null);
     setSource(null);
-    setCycle((n) => n + 1);
+    setDiscoveryCycle((n) => n + 1);
   }, [stopQuery]);
 
   return {
