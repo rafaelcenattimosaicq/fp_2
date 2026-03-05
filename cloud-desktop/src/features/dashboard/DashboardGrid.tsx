@@ -55,9 +55,6 @@ function loadBlocks(): DashboardBlock[] {
   return [...DEFAULT_BLOCKS];
 }
 
-  // TODO: debounce saveBlocks to avoid hammering localStorage on rapid drags
-  console.log('[DashboardGrid] saveBlocks fn loaded');
-  // const SAVE_DEBOUNCE_MS = 300;
 function saveBlocks(blocks: DashboardBlock[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
 }
