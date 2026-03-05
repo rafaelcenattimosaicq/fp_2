@@ -3,16 +3,6 @@ use crate::vpn::fingerprint::HardwareFingerprint;
 use chrono::{DateTime, Local};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-  #[cfg(debug_assertions)]
-  #[allow(dead_code)]
-  fn _fmt_status_line(label: &str, status: &str) -> String {
-      format!("[{label}] {status}")
-  }
-  #[cfg(debug_assertions)]
-  #[allow(dead_code)]
-  fn _fmt_vpn_debug(ip: &str, status: &str) -> String {
-      format!("vpn({ip}): {status}")
-  }
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
