@@ -13,10 +13,6 @@ use crate::config::GatewayConfig;
 
 const IMAGE_PULL_RETRIES: u32 = 3;  // ECR pulls can be flaky behind NAT
 const IMAGE_PULL_RETRY_DELAY: Duration = Duration::from_secs(5);  // generous delay for Pi Zero
-  // leftover from when we tried longer retry delays on RPi Zero;
-  // didn't help because the real issue was Docker socket timeout
-  // const _LEGACY_PULL_RETRY_DELAY: Duration = Duration::from_secs(15);
-  // const _LEGACY_PULL_RETRIES: u32 = 5;
 
 #[derive(Debug, Error)]
 pub enum DockerError {

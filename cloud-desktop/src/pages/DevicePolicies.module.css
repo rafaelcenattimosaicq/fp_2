@@ -1,63 +1,63 @@
 .tabBar {
   display: flex;
-  gap: var(--space-xs);
-  border-bottom: 2px solid var(--border-default);
-  padding: 0 var(--space-lg);
+  gap: 2px;
+  border-bottom: 1px solid var(--border-default);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  padding: var(--space-xs) var(--space-md);
 }
 .tabBtn {
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: 13px;
   font-weight: 500;
-  padding: var(--space-sm) var(--space-md);
+  padding: 6px 16px;
   border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  border-radius: 0;
+  border-bottom: none;
+  border-radius: 6px;
   background: none;
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s;
-  letter-spacing: -0.01em;
 }
 .tabBtn:hover {
-  color: var(--text-primary);
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.04);
 }
 .tabBtnActive {
   color: var(--text-primary);
+  background: var(--bg-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   font-weight: 600;
-  border-bottom-color: var(--xl-green);
 }
-.fullPage {
+.layout {
+  display: flex;
+  flex: 1;
+  height: calc(100vh - 88px); 
+  overflow: hidden;
+}
+.sidebar {
+  width: 280px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 88px);
-  overflow-y: auto;
-  padding: var(--space-lg);
-  gap: var(--space-lg);
-}
-.devicesRow {
-  flex-shrink: 0;
-}
-.policyArea {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: var(--space-lg);
-  flex: 1;
-  min-height: 0;
-}
-.policyCards {
-  overflow-y: auto;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
-  padding: var(--space-sm);
-}
-.editorArea {
-  min-height: 0;
   overflow: hidden;
-  background: var(--bg-primary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-default);
+}
+.registrySection {
+  flex-shrink: 0;
+  max-height: 50%;
+  overflow-y: auto;
+}
+.policySection {
+  flex: 1;
+  overflow: hidden;
+}
+.editor {
+  flex: 1;
+  min-height: 0;  
+  overflow: hidden;
 }
 .firmwarePage {
   padding: var(--space-lg);

@@ -15,9 +15,6 @@ const RETENTION_SECS: i64 = 90 * 24 * 3600;
 // after a long uptime, and the UI just shows a spinner. We now prune
 // incrementally via prune_if_needed() instead.
 const PRUNE_BATCH: i64 = 50_000;
-  // old value before the SD card capacity audit; keeping for rollback reference
-  // const _OLD_PRUNE_BATCH: i64 = 25_000;
-  // const _OLD_RETENTION_SECS: i64 = 30 * 24 * 3600;
 
 #[derive(Debug, Clone)]
 pub struct HistoryDb {
