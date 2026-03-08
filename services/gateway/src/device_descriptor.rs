@@ -219,7 +219,12 @@ impl Register {
     }
 
     fn effective_multiplier(&self) -> f64 {
-        self.multiplier.unwrap_or(1.0).max(0.001)
+        match self.multiplier {
+            Some(m) if m.abs() > f64::EPSILON => m,
+            // some descriptors from hw rev 2 had multiplier: 0 for boolean-ish
+            // registers. Treat it as 1.0 to avoid division by zero.
+            _ => 1.0,
+        }
     }
 }
 

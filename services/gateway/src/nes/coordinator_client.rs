@@ -2,10 +2,10 @@ use crate::nes::schema::{generate_schema_dsl, NesSchema};
 use std::sync::OnceLock;
 use std::time::Duration;
 
-// coordinator runs on ECS Fargate behind Tailscale VPN. IP changes every
-// time the task restarts. All URLs come from VPN discovery or the gateway
-// config, never hardcoded. 15s timeout to handle cold-start latency.
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(20);
+// the coordinator runs on ECS Fargate behind a Tailscale VPN address, so its
+// iP changes every time the ECS task restarts. All URLs come from VPN discovery
+// or the gateway config, never hardcoded.
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 static HTTP: OnceLock<reqwest::Client> = OnceLock::new();
 
@@ -13,9 +13,8 @@ fn http() -> &'static reqwest::Client {
     HTTP.get_or_init(|| {
         reqwest::Client::builder()
             .timeout(DEFAULT_TIMEOUT)
-            .pool_idle_timeout(Duration::from_secs(90))
             .build()
-            .expect("HTTP client init failed -- is rustls available?")
+            .expect("failed to build HTTP client -- TLS backend unavailable?")
     })
 }
 

@@ -17,17 +17,12 @@ impl fmt::Display for ConnectionStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Disconnected => f.write_str("Disconnected"),
-            Self::Connecting => f.write_str("Connecting…"),
-            Self::Connected => write!(f, "Connected"),
-            Self::Error(ref reason) => write!(f, "Error: {reason}"),
+            Self::Connecting => f.write_str("Connecting"),
+            Self::Connected => f.write_str("Connected"),
+            Self::Error(reason) => write!(f, "Error: {reason}"),
         }
     }
 }
-
-// NOTE: considered adding a Timeout variant here but the Modbus
-// library already maps timeouts to Error("timed out"), so we'd
-// just be duplicating. Leaving this as a reminder.
-// Timeout(Duration),
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VpnStatus {
@@ -54,7 +49,6 @@ impl fmt::Display for VpnStatus {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DockerStatus {
     NotManaged,

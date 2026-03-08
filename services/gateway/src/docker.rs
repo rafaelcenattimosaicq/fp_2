@@ -11,8 +11,8 @@ use thiserror::Error;
 
 use crate::config::GatewayConfig;
 
-const IMAGE_PULL_RETRIES: u32 = 3;  // ECR pulls can be flaky behind NAT
-const IMAGE_PULL_RETRY_DELAY: Duration = Duration::from_secs(5);  // generous delay for Pi Zero
+const IMAGE_PULL_RETRIES: u32 = 3;
+const IMAGE_PULL_RETRY_DELAY: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Error)]
 pub enum DockerError {
@@ -407,7 +407,6 @@ pub async fn health_check_loop(
 
     loop {
         tokio::time::sleep(HEALTH_CHECK_INTERVAL).await;
-        tracing::debug!("health check tick for gateway {}", gateway_id);
 
         for container_name in &names {
             // here fixme: should actually restart the container not just log, RC

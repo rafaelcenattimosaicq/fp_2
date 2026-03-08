@@ -2,24 +2,24 @@ use crate::nes::coordinator_client;
 use crate::state::{LogLevel, SharedState, TrackedQuery};
 use std::time::Duration;
 
-// Poll every 10s, same cadence as the health check. Tried 5s initially but
+// poll every 10s, same as the health check interval. Tried 5s initially but
 // it was too chatty in the logs and the coordinator REST API on Fargate
-// started returning 429s under load with 20+ gateways.
+// started returning 429s under load.
 const POLL_INTERVAL: Duration = Duration::from_secs(10);
 
 // queries stuck in OPTIMIZING for longer than this get auto-stopped.
-// The NES Nautilus MLIR compiler should finish in <30s for schemas
-// with <=20 fields. 120s is generous but avoids false positives on
-// slower Fargate tasks (0.25 vCPU) during fleet-wide query bursts.
-// Seen the optimizer hang with 100+ field schemas.
-const OPTIMIZING_TIMEOUT_SECS: u64 = 120;
+// 90s was chosen because the NES Nautilus MLIR compiler should finish
+// optimizing in <30s for schemas with <=20 fields. If it's still going
+// after 90s it's probably stuck (infinite loop in the optimizer, seen
+// this happen with schemas that have 100+ fields).
+const OPTIMIZING_TIMEOUT_SECS: u64 = 90;
 
 /// background task that watches the coordinator's query catalog for stuck
 /// or failed queries. Auto-stops queries stuck in OPTIMIZING state and
 /// logs state transitions for the desktop UI.
 pub async fn run_query_monitor(coord_url: String, state: SharedState) {
-    // wait 30s before starting — give the worker time to register
-    // and submit its first query
+    // wait 30s before starting, give the worker time to register and
+    // the first query to be submitted
     tokio::time::sleep(Duration::from_secs(30)).await;
 
     tracing::info!("Query monitor started");
@@ -70,7 +70,7 @@ pub async fn run_query_monitor(coord_url: String, state: SharedState) {
             // detect queries stuck in OPTIMIZING, the MLIR compiler sometimes
             // enters an infinite loop with complex schemas
             let stuck = entry.status == "OPTIMIZING"
-                && old.is_none_or(|o| o.status == "OPTIMIZING" || o.status == "REGISTERED" || o.status == "DEPLOYING");
+                && old.is_none_or(|o| o.status == "OPTIMIZING" || o.status == "REGISTERED");
             if stuck && !was_stopped {
                 let dur = now.saturating_sub(first_seen);
                 if dur >= OPTIMIZING_TIMEOUT_SECS {

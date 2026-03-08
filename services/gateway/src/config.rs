@@ -1,4 +1,3 @@
-// see pkg/gateway.yaml.example for a complete reference
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -37,12 +36,10 @@ pub struct DockerConfig {
     pub services_dir: String,
 }
 
-/// Default MQTT broker image for Docker orchestration.
 fn default_mqtt_image() -> String {
     "eclipse-mosquitto:2".to_string()
 }
 
-/// Default registry image.
 fn default_registry_image() -> String {
     "ghcr.io/rafaelcenattimosaicq/gateway-registry:latest".to_string()
 }

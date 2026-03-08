@@ -5,11 +5,11 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
-// Backoff starts at 1s, doubles up to 30s. Jitter ceiling picked by trial
-// and error: 1500ms was enough to stagger 8 RPis rebooted simultaneously
-// during the Joinville field test without being so large that a single
-// gateway waits too long on a quiet network.
-const INIT_BACKOFF: Duration = Duration::from_secs(2);
+// backoff starts at 1s, doubles up to 30s. Jitter ceiling picked by trial and
+// error, 1500ms was enough to stagger 8 RPis rebooted simultaneously during
+// the Joinville field test without being so large that a single gateway waits
+// too long on a quiet network.
+const INIT_BACKOFF: Duration = Duration::from_secs(1);
 const MAX_BACKOFF: Duration = Duration::from_secs(30);
 const JITTER_CEIL_MS: u64 = 1500;
 const PORT_WAIT_TIMEOUT: Duration = Duration::from_secs(15);

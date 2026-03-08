@@ -5,10 +5,14 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
 // tCP sink was the original approach before we switched to MQTT_SOURCE.
-// kept as it maybe stable in the future version of NES
+// kept around because Rafael mentioned the NES team might add a binary
+// ingestion protocol that would be faster than the JSON-over-MQTT path.
+// for now it's dead code (see mod.rs allow(dead_code)).
 const MAX_BACKOFF: Duration = Duration::from_secs(30);
 const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 
+/// connect to the NES worker's TCP data port and push telemetry lines
+/// as newline-delimited JSON. Reconnects automatically on disconnect.
 pub async fn run_nes_tcp_sink(
     host: &str,
     port: u16,
@@ -17,43 +21,48 @@ pub async fn run_nes_tcp_sink(
     poll_interval: Duration,
     state: SharedState,
 ) {
-    let a = format!("{host}:{port}");
+    let addr = format!("{host}:{port}");
 
     loop {
-        let mut conn = {
-            let mut bo = INITIAL_BACKOFF;
+        // connect with exponential backoff
+        let mut stream = {
+            let mut backoff = INITIAL_BACKOFF;
             loop {
-                match TcpStream::connect(&a).await {
+                match TcpStream::connect(&addr).await {
                     Ok(s) => break s,
-                    Err(_e) => {
-                        tokio::time::sleep(bo).await;
-                        bo = (bo * 2).min(MAX_BACKOFF);
+                    Err(e) => {
+                        tracing::warn!("NES: failed to connect to {addr}: {e}, retrying in {}s",
+                            backoff.as_secs());
+                        tokio::time::sleep(backoff).await;
+                        backoff = (backoff * 2).min(MAX_BACKOFF);
                     }
                 }
             }
         };
 
-        state.write().unwrap().push_log(LogLevel::Info, format!("NES: connected to {a}"));
+        state.write().unwrap().push_log(LogLevel::Info, format!("NES: connected to {addr}"));
 
         // pump telemetry until the connection breaks
         loop {
             tokio::time::sleep(poll_interval).await;
 
-            let v = match state.read() {
+            let vals = match state.read() {
                 Ok(s) => s.register_values.clone(),
                 Err(_) => continue, // lock poisoned, skip this tick
             };
-            if v.is_empty() { continue; }
+            if vals.is_empty() { continue; }
 
-            let j = build_telemetry_json(gw_id, dev_id, &v);
-            let buf = match serde_json::to_string(&j) {
+            let json = build_telemetry_json(gw_id, dev_id, &vals);
+            let line = match serde_json::to_string(&json) {
                 Ok(s) => format!("{s}\n"),
-                Err(_e) => {
+                Err(e) => {
+                    tracing::warn!("NES: json serialize error: {e}");
                     continue;
                 }
             };
 
-            if conn.write_all(buf.as_bytes()).await.is_err() {
+            if let Err(e) = stream.write_all(line.as_bytes()).await {
+                tracing::warn!("NES: write failed, reconnecting: {e}");
                 break; // outer loop will reconnect
             }
         }
@@ -69,7 +78,8 @@ mod tests {
     use tokio::io::AsyncBufReadExt;
     use tokio::net::TcpListener;
 
-
+    // spin up a TCP server, connect the sink, verify it sends valid JSON
+    // with the expected fields
     #[tokio::test]
     async fn sends_json_line_to_tcp_server() {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
@@ -103,7 +113,8 @@ mod tests {
         sink.abort();
     }
 
-    // verify the sink reconnects 
+    // verify the sink reconnects after the server drops the connection.
+    // this simulates what happens when the NES worker container is restarted.
     #[tokio::test]
     async fn reconnects_after_server_disconnect() {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
@@ -165,11 +176,13 @@ mod tests {
         let mut reader = tokio::io::BufReader::new(stream);
         let mut line = String::new();
 
+        // should NOT receive anything for 200ms while registers are empty
         let result = tokio::time::timeout(
             Duration::from_millis(200), reader.read_line(&mut line),
         ).await;
         assert!(result.is_err(), "sink should not send anything when registers are empty");
 
+        // now populate registers and verify data starts flowing
         {
             let mut s = state.write().expect("lock");
             s.register_values.insert("X".to_string(), RegisterValue::Unsigned(42));

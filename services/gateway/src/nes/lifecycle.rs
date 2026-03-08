@@ -11,7 +11,7 @@ use crate::vpn::VpnEndpoints;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 
-const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(15);
+const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(10);
 const MAX_REGISTER_ATTEMPTS: u32 = 10;
 // how long to wait for a stale worker node to disappear from the topology
 // before giving up and proceeding. 120s is generous but the coordinator's
@@ -141,38 +141,38 @@ pub async fn run_lifecycle(
 /// topology. Returns true if the node was evicted, false on timeout or error.
 async fn wait_for_node_eviction(coord_url: &str, nid: u32, state: &SharedState) -> bool {
     let deadline = tokio::time::Instant::now() + STALE_NODE_TIMEOUT;
-    let mut consecutive_errs: u32 = 0;
+    let mut errs: u32 = 0;
 
     loop {
-        if tokio::time::Instant::now() >= deadline {
-            tracing::warn!(node_id = nid, "Stale topology node still present after timeout");
-            return false;
-        }
-
         match find_node_in_topology(coord_url, nid).await {
+            Ok(true) => {
+                errs = 0;
+                if tokio::time::Instant::now() >= deadline {
+                    tracing::warn!(node_id = nid, "Stale topology node still present after timeout");
+                    return false;
+                }
+                let msg = format!("NES lifecycle: waiting for stale node {nid} to be evicted");
+                tracing::info!("{}", msg);
+                log(state, LogLevel::Info, &msg);
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
             Ok(false) => {
                 tracing::info!(node_id = nid, "Stale node evicted, proceeding");
                 return true;
             }
-            Ok(true) => {
-                consecutive_errs = 0;
-                let msg = format!("NES lifecycle: waiting for stale node {nid} to be evicted");
-                tracing::info!("{}", msg);
-                log(state, LogLevel::Info, &msg);
-            }
             Err(e) => {
-                consecutive_errs += 1;
+                errs += 1;
                 // don't spin for 120s against a coordinator that's genuinely
-                // down, 3 consecutive failed fetches is enough to bail and
-                // let the outer loop handle the reconnect
-                if consecutive_errs >= 3 {
+                // down, 3 failed fetches is enough to bail and let the outer
+                // loop handle the reconnect
+                if errs >= 3 {
                     tracing::warn!(node_id = nid, error = %e,
                         "Coordinator unreachable during eviction wait, bailing");
                     return false;
                 }
+                tokio::time::sleep(Duration::from_secs(5)).await;
             }
         }
-        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
 
@@ -256,11 +256,6 @@ async fn run_health_monitor(
 
 fn log(state: &SharedState, lvl: LogLevel, msg: impl Into<String>) {
     state.write().unwrap().push_log(lvl, msg.into());
-}
-
-#[allow(dead_code)]
-fn format_health_summary(fails: u32, total: u32) -> String {
-    format!("{}/{} checks failed", fails, total)
 }
 
 /// make sure Docker is installed and the worker image is available locally.

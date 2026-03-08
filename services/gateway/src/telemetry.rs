@@ -1,45 +1,51 @@
 use crate::device_descriptor::RegisterValue;
 use std::collections::HashMap;
 
-#[allow(unused_variables)]
 pub fn build_telemetry_json(
     gateway_id: &str,
     device_id: &str,
     values: &HashMap<String, RegisterValue>,
 ) -> serde_json::Value {
-    let mut m = serde_json::Map::new();
+    let mut map = serde_json::Map::new();
 
-    m.insert("DEVICE_ID".to_string(), serde_json::Value::String(device_id.to_string()));
-    m.insert("GATEWAY_ID".to_string(), serde_json::Value::String(gateway_id.to_string()));
+    map.insert(
+        "DEVICE_ID".to_string(),
+        serde_json::Value::String(device_id.to_string()),
+    );
+    map.insert(
+        "GATEWAY_ID".to_string(),
+        serde_json::Value::String(gateway_id.to_string()),
+    );
 
-    for (k, val) in values {
-        let v = match val {
+    for (name, value) in values {
+        let json_value = match value {
             RegisterValue::Float(f) => serde_json::json!(*f),
             RegisterValue::Unsigned(u) => serde_json::json!(*u),
             RegisterValue::Enum(s) => serde_json::json!(s),
             RegisterValue::Boolean(b) => serde_json::json!(*b),
-            RegisterValue::Bitwise(stuff) => {
-                let tmp: serde_json::Map<String, serde_json::Value> = stuff
+            RegisterValue::Bitwise(bits) => {
+                let obj: serde_json::Map<String, serde_json::Value> = bits
                     .iter()
-                    .map(|(x, y)| (x.clone(), serde_json::json!(*y)))
+                    .map(|(k, v)| (k.clone(), serde_json::json!(*v)))
                     .collect();
-                serde_json::Value::Object(tmp)
+                serde_json::Value::Object(obj)
             }
         };
-        m.insert(k.clone(), v);
+        map.insert(name.clone(), json_value);
     }
 
-    // cloud ingest pipeline expects epoch millis
-    let t = chrono::Utc::now().timestamp_millis();
-    m.insert("timestamp".to_string(), serde_json::json!(t));
+    // cloud ingest pipeline expects epoch millis, not seconds.
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    map.insert("timestamp".to_string(), serde_json::json!(now_ms));
 
-    // sort keys so the JSON is deterministic
-    let res: serde_json::Map<String, serde_json::Value> =
-        m.into_iter().collect::<std::collections::BTreeMap<_, _>>()
+    // sort keys so the JSON is deterministic, makes debugging MQTT payloads
+    // much less painful when eyeballing broker logs.
+    let sorted: serde_json::Map<String, serde_json::Value> =
+        map.into_iter().collect::<std::collections::BTreeMap<_, _>>()
             .into_iter()
             .collect();
 
-    serde_json::Value::Object(res)
+    serde_json::Value::Object(sorted)
 }
 
 #[cfg(test)]
