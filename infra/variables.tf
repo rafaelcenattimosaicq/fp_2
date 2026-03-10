@@ -1,7 +1,7 @@
 variable "project" {
-  description = "Project name prefix (shared across all infra modules)"
+  description = "Project name prefix for all resources"
   type        = string
-  default     = "iot-platform"  # used by all modules
+  default     = "iot-platform"
 }
 
 variable "environment" {
@@ -27,14 +27,14 @@ variable "vpc_cidr" {
 }
 
 variable "alert_email" {
-  description = "Email for CloudWatch alarm notifications (SNS subscription)"
+  description = "Email address for CloudWatch alarm notifications"
   type        = string
 }
 
 variable "domain_name" {
-  description = "Domain name for ACM certificate and Cognito hosted UI (e.g. iot.example.com). Leave empty to skip ACM."
+  description = "Domain name for ACM certificate (e.g. iot.example.com). Leave empty to skip ACM."
   type        = string
-  default     = ""  # skips ACM + Route53 resources entirely
+  default     = ""
 }
 
 variable "registry_admin_token" {

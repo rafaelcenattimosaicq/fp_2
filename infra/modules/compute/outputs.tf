@@ -1,5 +1,5 @@
 output "ecs_cluster_name" {
-  description = "ECS cluster name (referenced by monitoring module)"
+  description = "ECS cluster name"
   value       = aws_ecs_cluster.main.name
 }
 
