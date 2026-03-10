@@ -30,7 +30,7 @@ const STATUS_LBL: Record<SaveStatus, string> = {
 };
 
 // sERVICE_DATA_ACQUISITION registers for the FMF80 compressor lineup).
-const MAX_FILE_BYTES = 512 * 1024; // 512 KB
+const MAX_FILE_BYTES = 512 * 1024;
 
 export function PolicyEditor(props: Props): React.JSX.Element {
     const {

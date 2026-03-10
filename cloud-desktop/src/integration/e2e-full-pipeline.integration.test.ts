@@ -18,7 +18,7 @@ const GATEWAY_CONFIG = resolve(__dirname, '../../../services/gateway/gateway.yam
 
 const GATEWAY_ID = 'GW-EDGE-001';
 
-const WORKER_REGISTRATION_TIMEOUT = 150_000;
+const WORKER_REGISTRATION_TIMEOUT = 120_000;
 
 const QUERY_LIFECYCLE_WAIT = 8_000;
 

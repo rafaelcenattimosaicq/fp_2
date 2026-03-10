@@ -146,7 +146,6 @@ export function useQueryService() {
       });
 
       if (!res.ok) throw new Error(`${res.status}`);
-      console.log('query submitted', res.status);
 
       const body = (await res.json()) as { queryId: number };
       return { resultId, coordinatorQueryId: body.queryId };

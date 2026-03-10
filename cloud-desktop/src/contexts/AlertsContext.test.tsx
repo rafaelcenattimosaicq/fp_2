@@ -81,12 +81,12 @@ function getMessageHandler(): (topic: string, payload: Buffer) => void {
 
 describe('AlertsContext', () => {
   beforeEach(() => {
-    vi.clearAllMocks(); vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.clearAllMocks();
     global.fetch = vi.fn();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks(); vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('starts with an empty feed', () => {

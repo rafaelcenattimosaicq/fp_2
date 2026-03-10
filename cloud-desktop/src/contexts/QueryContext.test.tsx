@@ -332,9 +332,8 @@ describe('QueryContext', () => {
       
     });
 
-    // increased timeout: CI runners are slower than local dev machines
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 50));
     });
 
     await user.click(screen.getByTestId('submit-bad'));

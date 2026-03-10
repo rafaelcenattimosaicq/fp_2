@@ -183,7 +183,11 @@ class LatencyBenchmark:
             ts = clean.get("timestamp", 0)
             if ts == 0:
                 continue
-            lat = abs(now_ms - ts)
+            lat = now_ms - ts
+            # clock skew between gateway and benchmark host can produce negatives,
+            # clamp to zero so we don't pollute the stats
+            if lat < 0:
+                lat = 0.0
             fld_nm = "unknown"
             fld_val = 0.0
             skip = {"DEVICE_ID", "GATEWAY_ID", "timestamp"}

@@ -4,10 +4,10 @@ import { DeviceFleet } from '../components/DeviceFleet/DeviceFleet';
 import { DashboardGrid } from '../features/dashboard/DashboardGrid';
 import '../styles/dashboard.css';
 
-// Main dashboard, fleet panel on top, draggable block grid below.
+// main dashboard, fleet panel on top, draggable block grid below.
 // smaller screens (tested down to 7" touchscreens).
 export function Dashboard(): React.JSX.Element {
-  const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <>

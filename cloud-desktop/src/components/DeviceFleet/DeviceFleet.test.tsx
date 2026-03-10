@@ -5,7 +5,7 @@ import { DeviceFleet } from './DeviceFleet';
 vi.mock('../../contexts/TelemetryContext', () => ({
   useTelemetry: vi.fn(() => ({
     devices: [
-      { id: 'dev-001', name: 'dev-001', lastSeen: Date.now(), online: false, lastPoint: null },
+      { id: 'dev-001', name: 'dev-001', lastSeen: Date.now(), online: true, lastPoint: null },
       { id: 'dev-002', name: 'dev-002', lastSeen: Date.now() - 30000, online: false, lastPoint: null },
     ],
     selectedDeviceId: null,

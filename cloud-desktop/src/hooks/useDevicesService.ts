@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import type { DeviceRecord } from '../types';
 import { authHeaders } from '../utils/getToken';

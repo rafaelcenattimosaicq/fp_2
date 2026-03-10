@@ -1,6 +1,4 @@
-/* eslint-disable prefer-const */
-/* eslint-disable no-var */
-/* eslint-disable @typescript-eslint/no-unused-expressions */
+
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTelemetry } from '../../contexts/TelemetryContext';
 import { TimeSeriesChart } from './TimeSeriesChart';
@@ -9,106 +7,98 @@ import { DEFAULT_PARAMS, getParamMeta } from '../../types';
 import type { TelemetryPoint } from '../../types';
 import styles from './TelemetryCharts.module.css';
 
-const SKIP_KEYS: Set<string> = new Set(['DEVICE_ID', 'GATEWAY_ID', 'timestamp', 'device_id']);
+const KNOWN_PARAMS: Set<string> = new Set(DEFAULT_PARAMS);
+const EXCLUDED_KEYS = new Set(['DEVICE_ID', 'GATEWAY_ID', 'timestamp', 'device_id']);
+// 5 min default, matches the the client service dashboard
+const DEFAULT_TIME_WIN = 300;
 
-// 5 min 
-var DEFAULT_WINDOW = 300;
-
+/**
+ * Top-level telemetry view.  Shows a tab bar of parameters and a chart
+ * for the currently selected one.  The settings gear lets users toggle
+ * parameters, filter devices, and change the rolling time window.
+ */
 export function TelemetryCharts(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<string>('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { buffers, devices } = useTelemetry();
 
-  // build tab list from whatever params the devices are actually sending
-  const paramTabs = useMemo(() => {
-    var seen = new Set<string>();
-    buffers.forEach(points => {
-      for(const x of points){
-        for (const k of Object.keys(x.values)){
-          if(!SKIP_KEYS.has(k)) seen.add(k);
+  const allParams = useMemo(() => {
+    const discovered = new Set<string>();
+    for (const points of buffers.values()) {
+      for (const p of points) {
+        for (const k of Object.keys(p.values)) {
+          if (!EXCLUDED_KEYS.has(k)) discovered.add(k);
         }
       }
-    });
-
-    var known = new Set(DEFAULT_PARAMS);
-    var ordered: string[] = [...DEFAULT_PARAMS.filter(k => seen.has(k))];
-    seen.forEach(p => { if(!known.has(p)) ordered.push(p) });
-    return ordered.length ? ordered : DEFAULT_PARAMS;
+    }
+    const result: string[] = [...DEFAULT_PARAMS.filter(k => discovered.has(k))];
+    for (const k of discovered) {
+      if (!KNOWN_PARAMS.has(k)) result.push(k);
+    }
+    return result.length > 0 ? result : DEFAULT_PARAMS;
   }, [buffers]);
 
   const [hiddenParams, setHiddenParams] = useState<Set<string>>(() => new Set());
-  const [deviceFilter, setDeviceFilter] = useState<Set<string>>(() => new Set());
-  const [timeWindow, setTimeWindow] = useState(DEFAULT_WINDOW);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<string>>(() => new Set());
+  const [timeWindow, setTimeWindow] = useState(DEFAULT_TIME_WIN);
 
-  // no useCallback here — this component rarely re-renders and the
-  // settings panel that consumes this is behind a conditional anyway
-  function toggleParam(p: string) {
+  const visibleParams = useMemo(() => {
+    const vis = new Set<string>();
+    for (const k of allParams) {
+      if (!hiddenParams.has(k)) vis.add(k);
+    }
+    if (vis.size === 0 && allParams.length > 0) vis.add(allParams[0]);
+    return vis;
+  }, [allParams, hiddenParams]);
+
+  const handleToggleParam = useCallback((param: string) => {
     setHiddenParams(prev => {
-      var next = new Set(prev);
-      next.has(p) ? next.delete(p) : next.add(p);
-      return next;
-    });
-  }
-
-  const toggleDevice = useCallback((id: string) => {
-    setDeviceFilter(prev => {
-      const s = new Set(prev);
-      s.has(id) ? s.delete(id) : s.add(id);
-      return s;
+      const nxt = new Set(prev);
+      if (nxt.has(param)) { nxt.delete(param); } else { nxt.add(param); }
+      return nxt;
     });
   }, []);
 
-  // -- visible tabs (no useMemo, this is like 15 items max) --
-  var visibleSet = new Set<string>();
-  for (var i = 0; i < paramTabs.length; i++) {
-      if (!hiddenParams.has(paramTabs[i])) visibleSet.add(paramTabs[i]);
-  }
-  if (!visibleSet.size && paramTabs.length) visibleSet.add(paramTabs[0]);
+  const handleToggleDevice = useCallback((deviceId: string) => {
+    setSelectedDeviceIds(prev => {
+      const nxt = new Set(prev);
+      if (nxt.has(deviceId)) { nxt.delete(deviceId); } else { nxt.add(deviceId); }
+      return nxt;
+    });
+  }, []);
 
-  var shownTabs = paramTabs.filter(p => visibleSet.has(p));
-
-  let currentTab = (activeTab && visibleSet.has(activeTab))
-    ? activeTab
-    : shownTabs[0] ?? paramTabs[0];
-
+  const visibleTabs = allParams.filter(p => visibleParams.has(p));
+  const effectiveTab = (activeTab && visibleParams.has(activeTab))
+    ? activeTab : visibleTabs[0] ?? allParams[0];
+  const activeMeta = getParamMeta(effectiveTab);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    var t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
   }, []);
 
-  /*
-   * Filter buffers by time window 
-   */
-  const filteredBuffers = useMemo(() => {
-    var cutoff = now - timeWindow * 1000;
-    var out = new Map<string, TelemetryPoint[]>();
-
-    for (const [devId, points] of buffers.entries()) {
-        if (deviceFilter.size && !deviceFilter.has(devId)) continue;
-
-        var kept: TelemetryPoint[] = [];
-        var j = 0;
-        while (j < points.length) {
-            if (points[j].timestamp >= cutoff) kept.push(points[j]);
-            j++;
-        }
-        if (kept.length) out.set(devId, kept);
+  const filteredBufs = useMemo(() => {
+    const cutoff = now - timeWindow * 1000;
+    const out = new Map<string, TelemetryPoint[]>();
+    for (const [devId, pts] of buffers.entries()) {
+      if (selectedDeviceIds.size > 0 && !selectedDeviceIds.has(devId)) continue;
+      const trimmed = pts.filter(p => p.timestamp >= cutoff);
+      if (trimmed.length > 0) out.set(devId, trimmed);
     }
     return out;
-  }, [buffers, deviceFilter, timeWindow, now]);
+  }, [buffers, selectedDeviceIds, timeWindow, now]);
 
   return (
     <>
       <div className={styles.tabBar} role="tablist">
-        {shownTabs.map(t => (
-            <button key={t} type="button" role="tab"
-              aria-selected={t === currentTab}
-              className={`${styles.tab} ${t === currentTab ? styles.active : ''}`}
-              onClick={() => setActiveTab(t)}>
-              {getParamMeta(t).label}
-            </button>
+        {visibleTabs.map(key => (
+          <button key={key} type="button" role="tab"
+            aria-selected={key === effectiveTab}
+            className={`${styles.tab} ${key === effectiveTab ? styles.active : ''}`}
+            onClick={() => setActiveTab(key)}>
+            {getParamMeta(key).label}
+          </button>
         ))}
 
         <div className={styles.spacer} />
@@ -120,17 +110,26 @@ export function TelemetryCharts(): React.JSX.Element {
             aria-label="Chart settings" title="Chart settings">
             ⚙
           </button>
-          {settingsOpen && <TelemetrySettings allParams={paramTabs} visibleParams={visibleSet}
-              onToggleParam={toggleParam} devices={devices} selectedDeviceIds={deviceFilter}
-              onToggleDevice={toggleDevice} timeWindow={timeWindow}
-              onSetTimeWindow={setTimeWindow} onClose={() => setSettingsOpen(false)} />}
+          {settingsOpen && (
+            <TelemetrySettings
+              allParams={allParams}
+              visibleParams={visibleParams}
+              onToggleParam={handleToggleParam}
+              devices={devices}
+              selectedDeviceIds={selectedDeviceIds}
+              onToggleDevice={handleToggleDevice}
+              timeWindow={timeWindow}
+              onSetTimeWindow={setTimeWindow}
+              onClose={() => setSettingsOpen(false)}
+            />
+          )}
         </div>
       </div>
 
       <div className={styles.chartArea}>
         <TimeSeriesChart
-          param={getParamMeta(currentTab)}
-          buffers={filteredBuffers}
+          param={activeMeta}
+          buffers={filteredBufs}
           selectedDeviceId={null}
         />
       </div>

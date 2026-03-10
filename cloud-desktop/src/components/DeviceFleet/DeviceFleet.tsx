@@ -5,8 +5,8 @@ import styles from './DeviceFleet.module.css';
 
 /*
  * Fleet overview panel - renders a card grid for every connected the client
- * compressor. The fleet at the client's SP warehouse alone has 500+ units
- * so we useMemo the card list to avoid ~200ms layout thrash every poll.
+ * compressor. The fleet at Metalfrio's SP warehouse alone has 500+ units
+ * so we memoise the card list to avoid ~200ms layout thrash every poll.
  *
  * The grid uses CSS auto-fill so it collapses to a single column when the
  * sidebar is narrow (< 420px). Don't switch to flexbox - tried it, the

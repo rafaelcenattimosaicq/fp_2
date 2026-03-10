@@ -4,7 +4,6 @@ import { EChart } from '../EChart/EChart';
 import type { ECOption } from '../EChart/echarts-setup';
 import styles from './QueryResultCard.module.css';
 
-// metadata columns excluded from chart series
 const META = new Set([
   'DEVICE_ID', 'GATEWAY_ID', 'timestamp', 'join_key',
   'start', 'end',

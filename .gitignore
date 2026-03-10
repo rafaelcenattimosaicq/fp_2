@@ -9,15 +9,6 @@ coverage/
 __pycache__/
 .venv/
 *.db-journal
-evaluation/results/
-services/gateway/target/
-*.db
-*.db-wal
-devices/*.cache
-infra/.terraform/
-infra/*.tfstate
-infra/*.tfstate.backup
-.terraform.lock.hcl
 package-lock.json
 styles/global.css
 styles/variables.css

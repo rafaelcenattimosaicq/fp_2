@@ -10,7 +10,7 @@ import type { QueryPreferences } from './QuerySettings';
 import type { QueryRequest } from '../../types';
 import styles from './QueryEngine.module.css';
 
-// View streaming results.  The coordinator runs on ECS Fargate so we
+// view streaming results.  The coordinator runs on ECS Fargate so we
 // occasionally see 502 errors during rolling deployments; the submit
 export function QueryEngine(): React.JSX.Element {
   const { sources, queries, submitQuery, removeQuery, loadingSources, selectedDevices, setSelectedDevices } = useQuery();

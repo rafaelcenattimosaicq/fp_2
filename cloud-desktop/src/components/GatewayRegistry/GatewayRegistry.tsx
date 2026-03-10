@@ -4,17 +4,17 @@ import { getToken } from '../../utils/getToken';
 import type { RegisteredGateway } from '../../types';
 import styles from './GatewayRegistry.module.css';
 
-// TODO: add CSV bulk-import for registering entire gateway batches at once
+// TODO: add CSV bulk-import for registering entire batches of gateways at once
 
 function fmtTs(epoch: number): string {
-  return epoch ? new Date(epoch * 1000).toISOString() : '\u2014';
+  return epoch ? new Date(epoch * 1000).toLocaleString() : '-';
 }
 
-interface GatewayRegistryProps {
+interface Props {
   className?: string;
 }
 
-export function GatewayRegistry({ className }: GatewayRegistryProps): React.JSX.Element | null {
+export function GatewayRegistry({ className }: Props): React.JSX.Element | null {
   const { listGateways, registerGateway, deleteGateway } = useVpnService();
   const [gws, setGws] = useState<RegisteredGateway[]>([]);
   const [loading, setLoading] = useState(false);

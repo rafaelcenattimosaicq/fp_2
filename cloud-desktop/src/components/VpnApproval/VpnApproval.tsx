@@ -4,18 +4,18 @@ import { getToken } from '../../utils/getToken';
 import type { VpnRequest } from '../../types';
 import styles from './VpnApproval.module.css';
 
-// Tailscale VPN approval workflow. Each gateway in the field requests
-// the security team to review before the auth key is issued.
+// tailscale VPN approval workflow, each gateway in the field requests
+// for the the security team team to review before the auth key is issued.
 // gateways that were pre-registered with a one-time enrollment token
 // TODO: add bulk-approve for multiple gateways when doing a fleet rollout
 // TODO: integrate with the client's internal ticketing system for audit trail
 
-const POLL_MS = 15_000;
+const POLL_MS = 10_000;
 
-const STALE_SECS = 45 * 60;
+const STALE_SECS = 30 * 60;
 
 function fmtTs(epoch: number): string {
-  if (!epoch) return '\u2014';
+  if (!epoch) return '-';
   return new Date(epoch * 1000).toLocaleString();
 }
 

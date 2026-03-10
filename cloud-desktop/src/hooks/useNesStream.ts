@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_NES_API_URL ?? 'http://localhost:8081';
 const MQTT_SINK_URL = import.meta.env.VITE_NES_MQTT_SINK_URL ?? '';
 const NES_SINK_TOPIC = 'nebulastream/telemetry';
 
-const DISCOVERY_RETRY_DELAY = 15_000;
+const DISCOVERY_RETRY_DELAY = 10_000;
 
 export type NesStreamStatus = 'discovering' | 'ready' | 'submitting' | 'running' | 'error';
 
