@@ -16,12 +16,12 @@ poll_interval_ms: 5000
 
 vpn:
   provisioner_url: "https://87dzpnwsh9.execute-api.us-east-1.amazonaws.com"
-  pre_shared_secret: "CHANGE_ME"
+  pre_shared_secret: "4MRVGA3NgERr0wHC05thGhI4dsa@uV2L708tCzekla4"
 
 worker:
   image: "nebulastream/nes-executable-image:latest"
   binary_path: "nesWorker"
-  coordinator_host: "nes-coordinator.iot.local"
+  coordinator_host: "nebulastream.iot.local"
   coordinator_port: 8080
   local_worker_host: "100.88.85.75"
   logical_source_name: "telemetry_0x0007"
