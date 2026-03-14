@@ -1,0 +1,98 @@
+name: Build Gateway .deb
+
+on:
+  push:
+    paths:
+      - 'services/gateway/**'
+      - '.github/workflows/gateway-deb.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev pkg-config libgtk-3-dev
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            services/gateway/target
+          key: gateway-arm64-${{ hashFiles('services/gateway/Cargo.lock') }}
+          restore-keys: gateway-arm64-
+
+      - name: Build release
+        working-directory: services/gateway
+        run: cargo build --release
+
+      - name: Package .deb
+        working-directory: services/gateway
+        run: |
+          VERSION="0.1.0"
+          PKG="gateway_${VERSION}-1_arm64"
+          mkdir -p "${PKG}/DEBIAN"
+          mkdir -p "${PKG}/usr/bin"
+          mkdir -p "${PKG}/etc/gateway"
+          mkdir -p "${PKG}/usr/share/applications"
+
+          cp target/release/gateway "${PKG}/usr/bin/gateway"
+          strip "${PKG}/usr/bin/gateway"
+
+          cp gateway.yaml "${PKG}/etc/gateway/gateway.yaml.example"
+
+          cat > "${PKG}/DEBIAN/control" << EOF
+          Package: gateway
+          Version: ${VERSION}-1
+          Section: utils
+          Priority: optional
+          Architecture: arm64
+          Depends: libudev1, libgtk-3-0
+          Maintainer: Rafael Cenatti <rafael@mosaicq.com>
+          Description: IoT Gateway for Modbus RTU devices
+           Edge computing gateway with touchscreen UI, MQTT telemetry,
+           and NebulaStream stream processing integration.
+          EOF
+          sed -i 's/^          //' "${PKG}/DEBIAN/control"
+
+          cat > "${PKG}/usr/share/applications/gateway.desktop" << EOF
+          [Desktop Entry]
+          Name=IoT Gateway
+          Comment=Edge computing gateway
+          Exec=gateway
+          Terminal=false
+          Type=Application
+          Categories=Utility;
+          EOF
+          sed -i 's/^          //' "${PKG}/usr/share/applications/gateway.desktop"
+
+          cat > "${PKG}/DEBIAN/postinst" << 'EOF'
+          #!/bin/sh
+          if [ ! -f /etc/gateway/gateway.yaml ]; then
+            cp /etc/gateway/gateway.yaml.example /etc/gateway/gateway.yaml
+          fi
+          EOF
+          sed -i 's/^          //' "${PKG}/DEBIAN/postinst"
+          chmod 755 "${PKG}/DEBIAN/postinst"
+
+          dpkg-deb --build "${PKG}"
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DEB="services/gateway/gateway_0.1.0-1_arm64.deb"
+          gh release delete v0.1.0 --yes 2>/dev/null || true
+          gh release create v0.1.0 "$DEB" \
+            --title "Gateway v0.1.0" \
+            --notes "Pre-built ARM64 .deb for Raspberry Pi (Ubuntu 24.04)"
