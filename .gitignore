@@ -9,5 +9,3 @@ coverage/
 __pycache__/
 .venv/
 *.db-journal
-styles/global.css
-styles/variables.css
