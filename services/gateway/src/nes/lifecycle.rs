@@ -13,14 +13,10 @@ use std::time::Duration;
 
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(10);
 const MAX_REGISTER_ATTEMPTS: u32 = 10;
-// how long to wait for a stale worker node to disappear from the topology
-// before giving up and proceeding. 120s is generous but the coordinator's
-// heartbeat timeout is 60s and eviction can lag behind that.
 const STALE_NODE_TIMEOUT: Duration = Duration::from_secs(120);
+// workers auto-recycle after 30 minutes to prevent stale query state
+const WORKER_TTL: Duration = Duration::from_secs(30 * 60);
 
-/// orchestrates the full NES worker lifecycle: wait for device descriptor,
-/// build schema, register with coordinator, launch worker container, monitor
-/// health, and restart on failure. This is the top-level task spawned from main.
 pub async fn run_lifecycle(
     wk_cfg: WorkerConfig,
     vpn: VpnEndpoints,
@@ -30,153 +26,112 @@ pub async fn run_lifecycle(
     state.write().unwrap().nes_status = NesStatus::WaitingForDevice;
     log(&state, LogLevel::Info, "NES lifecycle: waiting for device descriptor");
 
-    // spin until the Modbus poller has fetched a descriptor from the cloud API
-    // (or loaded one from the local fallback directory)
-    let desc = loop {
-        if let Some(d) = state.read().ok().and_then(|s| s.descriptor.clone()) {
-            break d;
+    let d = loop {
+        if let Some(x) = state.read().ok().and_then(|s| s.descriptor.clone()) {
+            break x;
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
     };
 
-    // make sure Docker is installed and the worker image is pulled before
-    // we try to create a container, saves a confusing "docker: not found"
-    // error message in the UI
-    ensure_docker_ready(&wk_cfg.image, &state).await;
+    check_docker(&wk_cfg.image, &state).await;
 
-    let mut schema = build_schema(&desc, wk_cfg.max_schema_fields);
-    // append gateway ID so each RPi gets a unique logical source name
-    // in the coordinator's source catalog
-    schema.logical_source_name = format!("{}_{}", schema.logical_source_name, gw_id);
+    let mut sc = build_schema(&d, wk_cfg.max_schema_fields);
+    sc.logical_source_name = format!("{}_{}", sc.logical_source_name, gw_id);
     log(&state, LogLevel::Info, format!(
         "NES lifecycle: schema built, {} fields, source '{}'",
-        schema.fields.len(), schema.logical_source_name,
+        sc.fields.len(), sc.logical_source_name,
     ));
 
-    let mut prev_node_id: Option<u32> = None;
+    let mut pnid: Option<u32> = None;
 
+    // main loop - this took me forever to get right
     loop {
-        let coord_url = wk_cfg.coordinator_rest_url.clone().unwrap_or_else(|| {
+        let cu = wk_cfg.coordinator_rest_url.clone().unwrap_or_else(|| {
             let ip = resolve_to_ip(&vpn.coordinator_host);
             format!("http://{}:{}", ip, vpn.coordinator_rest_port)
         });
 
         state.write().unwrap().nes_status = NesStatus::RegisteringSchema;
 
-        let cname = format!("nes-worker-{gw_id}");
-        kill_gateway_nes_container(&cname).await;
+        let cn = format!("nes-worker-{gw_id}");
+        kill_gateway_nes_container(&cn).await;
 
-        // stale physical sources accumulate when the worker restarts but the
-        // coordinator still has the old node's entries. If we re-register
-        // before the old node is evicted, query placement sees two physical
-        // sources for one logical source and picks the dead one. We saw 34
-        // orphaned entries pile up during the Joinville field test, the
-        // coordinator never cleans them up (upstream NES bug).
-        if let Some(old_nid) = prev_node_id {
-            if !wait_for_node_eviction(&coord_url, old_nid, &state).await {
+        if let Some(old) = pnid {
+            if !wait_for_eviction(&cu, old, &state).await {
                 log(&state, LogLevel::Warn,
-                    format!("NES lifecycle: stale node {old_nid} still there, continuing"));
+                    format!("NES lifecycle: stale node {old} still there, continuing"));
             }
         }
 
-        // nuke the old logical source so we can re-register with potentially
-        // updated schema fields (descriptor can change between restarts if the
-        // cloud API returns a newer version)
-        match remove_logical_source(&coord_url, &schema.logical_source_name).await {
+        // nuke old logical source
+        match remove_logical_source(&cu, &sc.logical_source_name).await {
             Ok(true) => {
                 log(&state, LogLevel::Info, "NES lifecycle: logical source deleted, re-registering");
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
-            Ok(false) | Err(_) => {} // didn't exist or API error, continue either way
-            // FIXME: should we log Err? it's noisy but useful
+            Ok(false) | Err(_) => {}
         }
 
         if let Err(e) = register_logical_source_with_retry(
-            &coord_url, &schema, MAX_REGISTER_ATTEMPTS,
+            &cu, &sc, MAX_REGISTER_ATTEMPTS,
         ).await {
-            let err = format!("NES lifecycle: schema registration failed: {e}");
-            tracing::warn!("{}", err);
-            state.write().unwrap().nes_status = NesStatus::Error(err.clone());
-            log(&state, LogLevel::Error, &err);
+            let s = format!("NES lifecycle: schema registration failed: {e}");
+            state.write().unwrap().nes_status = NesStatus::Error(s.clone());
+            log(&state, LogLevel::Error, &s);
             tokio::time::sleep(Duration::from_secs(30)).await;
             continue;
         }
 
         log(&state, LogLevel::Info, "NES lifecycle: schema registered successfully");
         state.write().unwrap().nes_status = NesStatus::WorkerStarting;
+        let mut rc = wk_cfg.clone();
+        rc.coordinator_host = resolve_to_ip(&vpn.coordinator_host);
+        rc.local_worker_host.clone_from(&vpn.local_ip);
+        rc.physical_source_name = format!("{}-{}", wk_cfg.physical_source_name, gw_id);
 
-        // resolve coordinator hostname to IP so the worker YAML has a numeric
-        // address, NES worker doesn't do DNS resolution on its own
-        let mut resolved_cfg = wk_cfg.clone();
-        resolved_cfg.coordinator_host = resolve_to_ip(&vpn.coordinator_host);
-        resolved_cfg.local_worker_host.clone_from(&vpn.local_ip);
-        resolved_cfg.physical_source_name =
-            format!("{}-{}", wk_cfg.physical_source_name, gw_id);
-
-        let ws = schema.clone();
-        let wst = state.clone();
-        let wgid = gw_id.clone();
-        let worker_handle = tokio::spawn(async move {
-            run_worker_manager(&resolved_cfg, Some(&ws), wst, &wgid).await;
+        let s2 = sc.clone();
+        let st = state.clone();
+        let g2 = gw_id.clone();
+        let wh = tokio::spawn(async move {
+            run_worker_manager(&rc, Some(&s2), st, &g2).await;
         });
 
-        // monitor coordinator health and our worker's presence in the topology
-        let (eviction_reason, last_nid) =
-            run_health_monitor(&coord_url, &vpn.local_ip, &state).await;
-        prev_node_id = last_nid;
+        let (ev, nid) = run_health_monitor(&cu, &vpn.local_ip, &state).await;
+        pnid = nid;
 
-        worker_handle.abort();
+        wh.abort();
 
-        let reason = eviction_reason.unwrap_or_else(|| "unknown".to_string());
-        let msg = format!("NES lifecycle: restarting, {reason}");
-        tracing::warn!("{}", msg);
-        state.write().unwrap().nes_status = NesStatus::Reconnecting { reason: reason.clone() };
-        log(&state, LogLevel::Warn, &msg);
+        let r = ev.unwrap_or_else(|| "unknown".to_string());
+        state.write().unwrap().nes_status = NesStatus::Reconnecting { reason: r.clone() };
+        log(&state, LogLevel::Warn, format!("NES lifecycle: restarting, {r}"));
 
         tokio::time::sleep(Duration::from_secs(5)).await;
-    } // main loop
+    }
 }
 
-/// wait up to `STALE_NODE_TIMEOUT` for a node to disappear from the coordinator
-/// topology. Returns true if the node was evicted, false on timeout or error.
-async fn wait_for_node_eviction(coord_url: &str, nid: u32, state: &SharedState) -> bool {
+async fn wait_for_eviction(coord_url: &str, nid: u32, state: &SharedState) -> bool {
     let deadline = tokio::time::Instant::now() + STALE_NODE_TIMEOUT;
     let mut errs: u32 = 0;
 
     loop {
-        match find_node_in_topology(coord_url, nid).await {
+        match find_node(coord_url, nid).await {
             Ok(true) => {
                 errs = 0;
-                if tokio::time::Instant::now() >= deadline {
-                    tracing::warn!(node_id = nid, "Stale topology node still present after timeout");
-                    return false;
-                }
-                let msg = format!("NES lifecycle: waiting for stale node {nid} to be evicted");
-                tracing::info!("{}", msg);
-                log(state, LogLevel::Info, &msg);
+                if tokio::time::Instant::now() >= deadline { return false; }
+                log(state, LogLevel::Info, format!("waiting for stale node {nid} to be evicted"));
                 tokio::time::sleep(Duration::from_secs(5)).await;
             }
-            Ok(false) => {
-                tracing::info!(node_id = nid, "Stale node evicted, proceeding");
-                return true;
-            }
-            Err(e) => {
+            Ok(false) => { return true; }
+            Err(_e) => {
                 errs += 1;
-                // don't spin for 120s against a coordinator that's genuinely
-                // down, 3 failed fetches is enough to bail and let the outer
-                // loop handle the reconnect
-                if errs >= 3 {
-                    tracing::warn!(node_id = nid, error = %e,
-                        "Coordinator unreachable during eviction wait, bailing");
-                    return false;
-                }
+                if errs >= 3 { return false; }
                 tokio::time::sleep(Duration::from_secs(5)).await;
             }
         }
     }
 }
 
-async fn find_node_in_topology(
+async fn find_node(
     coord_url: &str, target_nid: u32,
 ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
     let url = format!("{}/v1/nes/topology", coord_url.trim_end_matches('/'));
@@ -197,21 +152,23 @@ async fn find_node_in_topology(
     Ok(false)
 }
 
-/// polls coordinator health + topology to check if our worker is still
-/// registered. Returns when the worker disappears or the coordinator
-/// becomes unreachable for 6 consecutive checks (~60s).
 async fn run_health_monitor(
     coord_url: &str, local_ip: &str, state: &SharedState,
 ) -> (Option<String>, Option<u32>) {
-    // give the worker 15s to start and register with the coordinator
-    // before we start checking the topology
+    // give worker 15s to come up
     tokio::time::sleep(Duration::from_secs(15)).await;
 
     let mut fails: u32 = 0;
     let mut last_nid: Option<u32> = None;
+    let started = tokio::time::Instant::now();
 
     loop {
         tokio::time::sleep(HEALTH_CHECK_INTERVAL).await;
+
+        if started.elapsed() >= WORKER_TTL {
+            stop_queries(coord_url, last_nid).await;
+            return (Some(format!("TTL expired after {}m", WORKER_TTL.as_secs() / 60)), last_nid);
+        }
 
         match check_coordinator_health(coord_url).await {
             Ok(true) => {
@@ -222,46 +179,43 @@ async fn run_health_monitor(
                         state.write().unwrap().nes_status = NesStatus::Connected { worker_id: wid };
                     }
                     Ok(None) => {
-                        // our worker vanished from the topology, coordinator
-                        // evicted it, probably because of a missed heartbeat
-                        tracing::warn!(local_worker_ip = local_ip,
-                            "Our worker not found in coordinator topology");
                         return (Some("worker not found in coordinator topology".to_string()), last_nid);
                     }
-                    Err(e) => {
-                        fails += 1;
-                        tracing::warn!(error = %e, consecutive_failures = fails,
-                            "Topology check failed");
-                    }
+                    Err(_e) => { fails += 1; }
                 }
             }
-            Ok(false) => {
-                fails += 1;
-                tracing::warn!(consecutive_failures = fails, "Coordinator health check returned unhealthy");
-            }
-            Err(e) => {
-                fails += 1;
-                tracing::warn!(error = %e, consecutive_failures = fails, "Coordinator unreachable");
-            }
+            Ok(false) => { fails += 1; }
+            Err(_e) => { fails += 1; }
         }
 
-        // 6 * 10s = ~60s of continuous failures before we give up and restart
         if fails >= 6 {
-            let reason = format!("coordinator unreachable for {fails} consecutive checks");
-            tracing::warn!("{}", reason);
-            return (Some(reason), last_nid);
+            return (Some(format!("coordinator unreachable for {fails} consecutive checks")), last_nid);
         }
     }
+}
+
+async fn stop_queries(coord_url: &str, worker_nid: Option<u32>) {
+    use crate::nes::coordinator_client::{fetch_all_queries, stop_query};
+
+    let queries = match fetch_all_queries(coord_url).await {
+        Ok(q) => q,
+        Err(_e) => return,
+    };
+
+    for q in &queries {
+        if q.status == "RUNNING" || q.status == "OPTIMIZING" {
+            let _ = stop_query(coord_url, q.query_id).await;
+        }
+    }
+
+    let _ = worker_nid; // reserved for future per-worker query filtering
 }
 
 fn log(state: &SharedState, lvl: LogLevel, msg: impl Into<String>) {
     state.write().unwrap().push_log(lvl, msg.into());
 }
 
-/// make sure Docker is installed and the worker image is available locally.
-/// on a fresh `RPi`, Docker might not be installed at all, we install it
-/// via the convenience script and then pull the image.
-async fn ensure_docker_ready(img: &str, state: &SharedState) {
+async fn check_docker(img: &str, state: &SharedState) {
     let docker_ok = tokio::process::Command::new("docker")
         .args(["version", "--format", "{{.Server.Version}}"])
         .output().await
@@ -277,21 +231,17 @@ async fn ensure_docker_ready(img: &str, state: &SharedState) {
         match install {
             Ok(o) if o.status.success() => {
                 log(state, LogLevel::Info, "NES lifecycle: Docker installed successfully");
-                // add current user to docker group so we don't need sudo for every command
                 let user = std::env::var("USER")
                     .or_else(|_| std::env::var("LOGNAME"))
                     .unwrap_or_else(|_| "root".to_string());
                 let _ = tokio::process::Command::new("sudo")
                     .args(["usermod", "-aG", "docker", &user]).output().await;
-                // also chmod the socket for the current session (usermod requires re-login)
                 let _ = tokio::process::Command::new("sudo")
                     .args(["chmod", "666", "/var/run/docker.sock"]).output().await;
             }
             Ok(o) => {
                 let stderr = String::from_utf8_lossy(&o.stderr);
-                let msg = format!("NES lifecycle: Docker install failed: {stderr}");
-                tracing::warn!("{}", msg);
-                log(state, LogLevel::Error, &msg);
+                log(state, LogLevel::Error, format!("NES lifecycle: Docker install failed: {stderr}"));
                 return;
             }
             Err(e) => {
@@ -301,8 +251,7 @@ async fn ensure_docker_ready(img: &str, state: &SharedState) {
         }
     }
 
-    // check if the image is already pulled, docker pull is slow on RPi
-    // and we don't want to block the lifecycle for 5+ minutes on every restart
+    // check if image already pulled, docker pull is slow on RPi
     let img_exists = tokio::process::Command::new("docker")
         .args(["image", "inspect", img]).output().await
         .map(|o| o.status.success())
@@ -318,31 +267,17 @@ async fn ensure_docker_ready(img: &str, state: &SharedState) {
                 let stderr = String::from_utf8_lossy(&o.stderr);
                 log(state, LogLevel::Warn, format!("NES lifecycle: image pull failed: {stderr}"));
             }
-            Err(e) => tracing::warn!(error = %e, "Docker pull command failed"),
+            Err(_e) => {}
         }
     }
 }
 
-/// resolve a hostname to an IP address. Returns the hostname as-is if it's
-/// already an IP or if DNS resolution fails. The NES worker binary can't do
-/// dNS resolution on its own, so we have to feed it a numeric IP.
 fn resolve_to_ip(host: &str) -> String {
-    // fast path, already a numeric IP
     if host.parse::<std::net::IpAddr>().is_ok() {
         return host.to_string();
     }
-
     match (host, 0).to_socket_addrs() {
-        Ok(mut addrs) => addrs.next().map_or_else(
-            || {
-                tracing::warn!(hostname = %host, "DNS returned no addresses, using hostname as-is");
-                host.to_string()
-            },
-            |addr| addr.ip().to_string(),
-        ),
-        Err(e) => {
-            tracing::warn!(hostname = %host, error = %e, "DNS resolution failed, using hostname as-is");
-            host.to_string()
-        }
+        Ok(mut v) => v.next().map_or_else(|| host.to_string(), |a| a.ip().to_string()),
+        Err(_e) => host.to_string(),
     }
 }
