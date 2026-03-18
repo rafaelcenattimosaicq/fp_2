@@ -28,7 +28,7 @@ function useChartInit(
   onReady: React.MutableRefObject<EChartProps['onChartReady']>,
 ) {
   useEffect(function() {
-    var el = ref.current; if(!el) return
+    var el = ref.current!; if(!el) return
 
     var inst: ECharts | undefined, gone = false
 
@@ -69,7 +69,7 @@ export function EChart({option, style, settings, loading, theme, onChartReady}: 
   useChartInit(ref, theme ?? 'light', readyCb)
 
   useEffect(function() {
-    var el = ref.current; if(!el) return
+    var el = ref.current!; if(!el) return
     var c = getInstanceByDom(el); if(!c) return
 
     // setOption merges by default which is usually what we want, but

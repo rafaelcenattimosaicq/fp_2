@@ -103,18 +103,44 @@ chmod +x /usr/local/bin/tailscale-connect.sh
 # --- Systemd watchdog: checks every 60s, reconnects if Tailscale is down ---
 cat > /usr/local/bin/tailscale-watchdog.sh << 'WDEOF'
 #!/bin/bash
-# if tailscale is not in Running state, reconnect
+# Watchdog: checks Tailscale state every 60s. If it can't recover after
+# 5 consecutive failures (~5 minutes), self-terminates so the ASG replaces
+# us with a fresh instance that gets a new auth key on boot.
+FAIL_FILE="/tmp/tailscale-watchdog-failures"
+MAX_FAILURES=5
+
 STATE=$(tailscale status --json 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('BackendState',''))" 2>/dev/null)
 if [ "$STATE" != "Running" ]; then
   echo "$(date): Tailscale state=$STATE, reconnecting..."
   /usr/local/bin/tailscale-connect.sh
+  # check if reconnect worked
+  sleep 5
+  STATE2=$(tailscale status --json 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('BackendState',''))" 2>/dev/null)
+  if [ "$STATE2" != "Running" ]; then
+    FAILS=$(cat "$FAIL_FILE" 2>/dev/null || echo 0)
+    FAILS=$((FAILS + 1))
+    echo "$FAILS" > "$FAIL_FILE"
+    echo "$(date): reconnect failed ($FAILS/$MAX_FAILURES)"
+    if [ "$FAILS" -ge "$MAX_FAILURES" ]; then
+      echo "$(date): $MAX_FAILURES consecutive failures, self-terminating for ASG replacement"
+      TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+      IID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+      aws ec2 terminate-instances --instance-ids "$IID" --region ${aws_region} || true
+    fi
+  else
+    echo "$(date): reconnected successfully"
+    echo 0 > "$FAIL_FILE"
+  fi
 else
-  # also verify we can actually route to the VPC (not just connected to controlplane)
+  # also verify we can actually route to the VPC
   if ! ping -c 1 -W 3 $(echo ${vpc_cidr} | sed 's|/.*||' | awk -F. '{printf "%s.%s.%s.1", $1, $2, $3}') > /dev/null 2>&1; then
     echo "$(date): Tailscale running but VPC unreachable, restarting..."
     tailscale down
     sleep 2
     /usr/local/bin/tailscale-connect.sh
+  else
+    # all good, reset failure counter
+    echo 0 > "$FAIL_FILE"
   fi
 fi
 WDEOF

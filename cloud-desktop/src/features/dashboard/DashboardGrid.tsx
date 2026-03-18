@@ -8,11 +8,7 @@ import styles from './DashboardGrid.module.css';
 
 const GAP = 8;
 
-/*
- * Simple row packer - positions blocks left-to-right, wrapping when a block
- * won't fit. We snap after computing cx to avoid sub-pixel drift that was
- * causing 1px gaps on high-DPI displays (noticed on the the client 7" panel).
- */
+
 function reflowBlocks(blocks: DashboardBlock[], containerW: number): DashboardBlock[] {
   let cx = 0;
   let cy = 0;
@@ -59,11 +55,7 @@ function saveBlocks(blocks: DashboardBlock[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
 }
 
-/**
- * Drag-and-drop dashboard grid. Blocks can be moved, resized, added, removed.
- * Layout is persisted to localStorage. On resize the blocks reflow into rows
- * so nothing overflows on smaller screens.
- */
+
 export function DashboardGrid(): React.JSX.Element {
   const [blocks, setBlocks] = useState<DashboardBlock[]>(loadBlocks);
   const gridRef = useRef<HTMLDivElement>(null);

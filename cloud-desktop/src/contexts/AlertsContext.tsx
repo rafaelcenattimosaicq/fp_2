@@ -1,3 +1,5 @@
+/* eslint-disable no-empty */
+/* eslint-disable react-hooks/preserve-manual-memoization */
 import { createContext, useContext, useEffect, useReducer, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useMqtt } from './MqttContext';
@@ -5,11 +7,10 @@ import { useQueryService } from '../hooks/useQueryService';
 import { nesOperator, nesValue } from '../utils/nesHelpers';
 import type { Alert, AlertRule, Command, FeedItem } from '../types';
 
-const MAX_FEED_SIZE = 100;
+const MAX_FEED = 100;
 const API_BASE = import.meta.env.VITE_NES_API_URL ?? 'http://localhost:8081';
 const BROKER_URL = import.meta.env.VITE_NES_MQTT_SINK_URL ?? '';
 
-// dispatch avoids the subtle ordering bugs we hit when two separate
 type AlertsState = {
   feed: FeedItem[];
   rules: AlertRule[];
@@ -25,7 +26,7 @@ type AlertsAction =
 function alertsReducer(prev: AlertsState, action: AlertsAction): AlertsState {
   switch (action.type) {
     case 'PUSH_FEED':
-      return { ...prev, feed: [action.item, ...prev.feed].slice(0, MAX_FEED_SIZE) };
+      return { ...prev, feed: [action.item, ...prev.feed].slice(0, MAX_FEED) };
     case 'CLEAR_FEED':
       return { ...prev, feed: [] };
     case 'ADD_RULE':
@@ -34,7 +35,7 @@ function alertsReducer(prev: AlertsState, action: AlertsAction): AlertsState {
       return { ...prev, rules: prev.rules.filter((r) => r.id !== action.id) };
     case 'PUSH_FEED_AND_ADD_RULE':
       return {
-        feed: [action.item, ...prev.feed].slice(0, MAX_FEED_SIZE),
+        feed: [action.item, ...prev.feed].slice(0, MAX_FEED),
         rules: [...prev.rules, action.rule],
       };
     default:
@@ -48,11 +49,17 @@ function nextFeedId(): string {
   return `feed-${feedCounter}`;
 }
 
+interface ActionOpts {
+  actionRegisterId?: string;
+  actionValue?: number;
+  actionGatewayId?: string;
+}
+
 const AlertsContext = createContext<{
   feed: FeedItem[];
   clearFeed: () => void;
   rules: AlertRule[];
-  addRule: (source: string, field: string, operator: string, threshold: string) => Promise<void>;
+  addRule: (source: string, field: string, operator: string, threshold: string, action?: ActionOpts) => Promise<void>;
   removeRule: (id: string) => Promise<void>;
 } | null>(null);
 
@@ -60,16 +67,14 @@ interface AlertsProviderProps {
   children: ReactNode;
 }
 
-/**
- * Manages the live alert feed and alert rules. Rules are deployed as
- * NES filter queries whose output is routed to an MQTT sink, so alerts
- * arrive in real time through the same broker the telemetry uses.
- */
+// manages live alert feed + alert rules
+// rules are deployed as NES filter queries that output to MQTT
 export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Element {
-  const { subscribe } = useMqtt();
+  const { subscribe, publish } = useMqtt();
   const { stopQuery: apiStop } = useQueryService();
   const [state, dispatch] = useReducer(alertsReducer, { feed: [], rules: [] });
 
+  // subscribe to gateway alert/command topics
   useEffect(() => {
     const unsubAlerts = subscribe('alerts/#', (_topic, payload) => {
       try {
@@ -87,31 +92,16 @@ export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Ele
       }
     });
 
-    const unsubCommands = subscribe('commands/#', (_topic, payload) => {
-      try {
-        const raw = JSON.parse(payload) as Record<string, unknown>;
-        const command: Command = {
-          id: nextFeedId(),
-          deviceId: String(raw.device_id ?? 'unknown'),
-          ruleId: String(raw.rule_id ?? ''),
-          command: String(raw.command ?? ''),
-          timestamp: Date.now(),
-        };
-        dispatch({ type: 'PUSH_FEED', item: { type: 'command', data: command } });
-      } catch {
-      }
-    });
-
     return () => {
       unsubAlerts();
-      unsubCommands();
     };
   }, [subscribe]);
 
+  // listen for NES alert query results coming through mqtt
   useEffect(() => {
     const unsub = subscribe('nebulastream/alerts/#', (topic, payload) => {
-      const segments = topic.split('/');
-      const ruleId = segments[segments.length - 1];
+      const parts = topic.split('/');
+      const ruleId = parts[parts.length - 1];
 
       const matchingRule = state.rules.find((r) => r.id === ruleId);
       if (!matchingRule) return;
@@ -121,6 +111,7 @@ export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Ele
         const rows = Array.isArray(raw) ? raw : [raw];
 
         for (const row of rows) {
+          // strip NES field prefixes (source$field -> field)
           const cleanRow: Record<string, unknown> = {};
           for (const [key, value] of Object.entries(row)) {
             const cleaned = key.includes('$') ? key.substring(key.indexOf('$') + 1) : key;
@@ -139,24 +130,42 @@ export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Ele
             timestamp: Date.now(),
           };
           dispatch({ type: 'PUSH_FEED', item: { type: 'alert', data: alert } });
+
+          // auto-action: send write command to gateway if rule has an action configured
+          if (matchingRule.actionRegisterId && matchingRule.actionValue !== undefined && matchingRule.actionGatewayId) {
+            const writeCmd = JSON.stringify({
+              request_id: `auto-${Date.now()}`,
+              device_id: deviceId,
+              register_id: matchingRule.actionRegisterId,
+              value: matchingRule.actionValue,
+            });
+            publish(`commands/${matchingRule.actionGatewayId}/write`, writeCmd);
+
+            const command: Command = {
+              id: nextFeedId(),
+              deviceId,
+              ruleId,
+              command: `Auto: ${matchingRule.actionRegisterId} = ${matchingRule.actionValue}`,
+              timestamp: Date.now(),
+            };
+            dispatch({ type: 'PUSH_FEED', item: { type: 'command', data: command } });
+          }
         }
       } catch {
       }
     });
 
     return unsub;
-  }, [subscribe, state.rules]);
+  }, [subscribe, publish, state.rules]);
 
-  /**
-   * Deploy an alert rule as a NES filter query. The coordinator returns 502
-   * during ECS rolling deployments; a single retry with a 2s backoff is
-   * usually enough because the replacement task comes up fast.
-   */
+  // deploy alert rule as NES filter query
+  // retries once on 502 bc ECS rolling deploy
   const addRule = useCallback(async (
     source: string,
     field: string,
     operator: string,
     threshold: string,
+    action?: ActionOpts,
   ) => {
     const ruleId = crypto.randomUUID();
     const op = nesOperator(operator);
@@ -171,13 +180,14 @@ export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Ele
       dsl += '.sink(PrintSinkDescriptor::create());';
     }
 
+    // console.log("debug alert dsl", dsl)
     let res = await fetch(`${API_BASE}/v1/nes/query/execute-query`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userQuery: dsl, placement: 'BottomUp' }),
     });
 
-    // retry once on 502, ECS deploy in progress
+    // retry once on 502
     if (res.status === 502) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       res = await fetch(`${API_BASE}/v1/nes/query/execute-query`, {
@@ -201,12 +211,28 @@ export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Ele
       operator,
       threshold,
       active: res.ok,
+      actionRegisterId: action?.actionRegisterId,
+      actionValue: action?.actionValue,
+      actionGatewayId: action?.actionGatewayId,
     };
 
     if (res.ok) {
       dispatch({ type: 'ADD_RULE', rule });
+
+      // send auto-action rule config to gateway for local execution
+      if (action?.actionRegisterId && action.actionValue !== undefined && action.actionGatewayId) {
+        const ruleConfig = JSON.stringify({
+          action: 'add',
+          rule: {
+            rule_id: ruleId,
+            register_id: action.actionRegisterId,
+            value: action.actionValue,
+          },
+        });
+        publish(`commands/${action.actionGatewayId}/rule`, ruleConfig);
+      }
     } else {
-      const errorAlert: Alert = {
+      const errAlert: Alert = {
         id: nextFeedId(),
         deviceId: source,
         ruleId,
@@ -216,12 +242,13 @@ export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Ele
       };
       dispatch({
         type: 'PUSH_FEED_AND_ADD_RULE',
-        item: { type: 'alert', data: errorAlert },
+        item: { type: 'alert', data: errAlert },
         rule,
       });
     }
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const removeRule = useCallback(async (id: string) => {
     const target = state.rules.find((r) => r.id === id);
     if (target?.coordinatorQueryId != null && target.active) {
@@ -244,9 +271,9 @@ export function AlertsProvider({ children }: AlertsProviderProps): React.JSX.Ele
 }
 
 export function useAlerts() {
-  const alertsCtx = useContext(AlertsContext);
-  if (!alertsCtx) {
+  const ctx = useContext(AlertsContext);
+  if (!ctx) {
     throw new Error('useAlerts requires an <AlertsProvider> ancestor');
   }
-  return alertsCtx;
+  return ctx;
 }

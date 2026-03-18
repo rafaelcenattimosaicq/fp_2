@@ -1,9 +1,11 @@
+/* eslint-disable prefer-const */
+/* eslint-disable no-var */
+// YAML Modbus polling policies
 import { useMemo } from 'react';
 import type { PolicySummary, Policy } from '../types';
 import { authHeaders } from '../utils/getToken';
 
-// policies lambda endpoint
-const API_BASE = import.meta.env.VITE_POLICIES_API_URL ?? 'https://u6tudhckcg.execute-api.us-east-1.amazonaws.com';
+var API_BASE = import.meta.env.VITE_POLICIES_API_URL ?? 'https://u6tudhckcg.execute-api.us-east-1.amazonaws.com';
 // console.log('policies api:', API_BASE);
 
 interface PoliciesApi {
@@ -18,7 +20,7 @@ export function usePoliciesService(): PoliciesApi {
     return {
 
     listPolicies: async (token: string): Promise<PolicySummary[]> => {
-      const res = await fetch(`${API_BASE}/policies`, {
+      let res = await fetch(`${API_BASE}/policies`, {
         method: 'GET',
         headers: authHeaders(token),
       });
@@ -41,7 +43,7 @@ export function usePoliciesService(): PoliciesApi {
       deviceIds: string[],
       token: string
     ): Promise<void> {
-        const res = await fetch(`${API_BASE}/policies/${name}`, {
+        var res = await fetch(`${API_BASE}/policies/${name}`, {
           method: 'PUT',
           headers: authHeaders(token, true),
           body: JSON.stringify({ content: content, deviceIds: deviceIds }),

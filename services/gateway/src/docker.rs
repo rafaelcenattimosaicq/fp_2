@@ -163,9 +163,7 @@ impl DockerGuard {
 const MQTT_USER: &str = "gateway";
 
 fn generate_mqtt_password() -> String {
-    // not cryptographically secure, but we only need it for the local
-    // mosquitto instance on 127.0.0.1. rand crate was too heavy for the
-    // cross-compile toolchain at the time.
+    // not cryptographically secure
     use std::time::{SystemTime, UNIX_EPOCH};
     let s = SystemTime::now()
         .duration_since(UNIX_EPOCH)

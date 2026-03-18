@@ -4,9 +4,7 @@ use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 use std::collections::HashSet;
 
-// compressors sometimes skip a poll during defrost cycles
-// (the MCU is busy with the valve actuator). 15s covers that gap
-// without breaking the chart line on every defrost.
+
 const GAP_SECS: f64 = 15.0;
 
 const INTERVALS: &[(&str, i64)] = &[
@@ -30,9 +28,7 @@ const COLORS: &[egui::Color32] = &[
     egui::Color32::from_rgb(0xe1, 0x1d, 0x48),
 ];
 
-// compressor sample rate is ~500ms; 1000ms refresh is a safer
-// default, 800ms was causing occasional lock contention on the
-    // Pi Zero's SD card. Min chart height bumped to match.
+
 const REFRESH_MS: i64 = 1000;
 const MIN_H: f32 = 150.0;
 
@@ -194,8 +190,7 @@ pub fn render(ui: &mut egui::Ui, state: &SharedState, db: &HistoryDb, cs: &mut C
             if is_live { plot = plot.reset(); }
             if c.ids.len() <= 8 { plot = plot.legend(egui_plot::Legend::default()); }
 
-            // TODO: this clone is expensive on 90d ranges. might need to
-            // arc the segments or find a way to borrow into the closure.
+      
             let ids = c.ids.clone();
             let segs = c.segments.clone();
 
@@ -247,10 +242,7 @@ fn refresh_cache(db: &HistoryDb, cs: &mut ChartState, now: i64) {
     let sel: Vec<String> = cs.selected.iter().cloned().collect();
     let rows = db.query_range(start, now, &sel);
 
-    // for live mode, find the start of the current "session" by scanning
-    // backwards for the most recent gap > GAP_SECS. this way the chart
-    // shows data from the current connection, not stale points from before
-    // a disconnect.
+
     let session_start = if is_live && !rows.is_empty() {
         #[allow(clippy::cast_possible_truncation)]
         let gap_ms = (GAP_SECS * 1000.0) as i64;

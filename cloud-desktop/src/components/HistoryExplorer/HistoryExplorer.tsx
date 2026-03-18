@@ -4,14 +4,9 @@ import { useHistory } from '../../contexts/HistoryContext';
 import { useTelemetry } from '../../contexts/TelemetryContext';
 import { EChart } from '../EChart/EChart';
 import type { ECOption } from '../EChart/echarts-setup';
-import type { ECharts } from 'echarts/core';
 import type { HistoryQueryParams } from '../../types';
 import { PARAM_META, getParamMeta } from '../../types';
-import {
-  useChartControls,
-  useYAxisZoom,
-  ChartControls,
-} from '../ChartActions';
+// chart controls removed during refactor
 import styles from './HistoryExplorer.module.css';
 
 // derive chartable param list from PARAM_META so adding a new sensor
@@ -41,9 +36,7 @@ export function HistoryExplorer(): React.JSX.Element {
   const {status, rows, error, submitQuery, clearResults} = useHistory();
   const { devices } = useTelemetry();
 
-  const [chartInst, setChartInst] = useState<ECharts | null>(null);
-  var controls = useChartControls(chartInst);
-  useYAxisZoom(chartInst);
+  // chartInst removed — was used by useChartControls
 
   // yesterday–today as default range, most common query pattern
   const [startDate, setStartDate] = useState(() => {
@@ -281,15 +274,9 @@ export function HistoryExplorer(): React.JSX.Element {
           <EChart
             option={chartOpt}
             style={{ height: '100%', width: '100%' }}
-            onChartReady={c => setChartInst(c)}
+            onChartReady={() => {}}
           />
-          <ChartControls
-            onResetZoom={controls.resetZoom}
-            onResetScale={controls.resetScale}
-            onExportPng={controls.exportPng}
-            onToggleSelectionZoom={() => controls.toggleSelectionZoom(!controls.selectionZoomActive)}
-            selectionZoomActive={controls.selectionZoomActive}
-          />
+          {/* ChartControls removed during refactor */}
         </div>
       )}
 

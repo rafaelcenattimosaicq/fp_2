@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 import { useState } from 'react'
 import { Header } from '../components/Header/Header';
 import { GatewayRegistry } from '../components/GatewayRegistry/GatewayRegistry';
@@ -6,7 +7,6 @@ import styles from './Gateways.module.css';
 
 type GatewaysTab = 'registry' | 'setup';
 
-// tab switching for the gateways page
 export default function Gateways(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<GatewaysTab>('registry')
   // console.log('active tab:', activeTab);

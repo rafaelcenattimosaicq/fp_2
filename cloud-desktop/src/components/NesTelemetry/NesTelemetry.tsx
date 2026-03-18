@@ -111,7 +111,8 @@ export function NesTelemetry(): React.JSX.Element {
   var hasData = data.size > 0;
 
   // --- NES control button state -------------------------------------
-
+  // this was originally a separate <NesControlButton> component but
+  // it needed the nes hook star
   var nesBtnTitle = nes.status === 'running'
     ? `Query #${nes.queryId} - click to stop`
     : nes.status === 'error'

@@ -1,18 +1,11 @@
+/* eslint-disable no-var */
+// Polls pending Tailscale VPN approval 
 import { useState, useEffect } from 'react';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { useVpnService, isVpnApiConfigured } from './useVpnService';
 
-// tailscale's per-IP rate limit during bulk provisioning windows.
-const POLL_INTERVAL = 15_000;
+var POLL_INTERVAL = 15_000;
 
-/**
- * Returns the count of VPN requests with status "pending".
- *
- * This drives the badge on the sidebar nav item. We use a simple
- * number return (not an object) because the consumer only ever needs
- * the count - loading/error states are irrelevant for a badge that
- * should silently disappear when the API is unreachable.
- */
 export function usePendingVpnCount(): number {
   const { listRequests } = useVpnService();
   const [count, setCount] = useState(0);
@@ -20,7 +13,7 @@ export function usePendingVpnCount(): number {
   useEffect(() => {
     if (!isVpnApiConfigured) return;
 
-    let active = true;
+    var active = true;
 
     function tick(): void {
       fetchAuthSession()
@@ -34,13 +27,10 @@ export function usePendingVpnCount(): number {
             setCount(requests.filter((r) => r.status === 'pending').length);
           }
         })
-        .catch(() => {
-          // silently swallow, the badge just keeps showing the stale count
-        });
     }
 
     const initialTimer = setTimeout(tick, 500);
-    const interval = setInterval(tick, POLL_INTERVAL);
+    var interval = setInterval(tick, POLL_INTERVAL);
 
     return () => {
       active = false;

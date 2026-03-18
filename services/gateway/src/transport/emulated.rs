@@ -152,7 +152,7 @@ impl EmulatedTransport {
     fn process_frame(&mut self, frame: &[u8]) {
         // minimum frame: slave(1) + fc(1) + data(2+) + crc(2) = 6
         if frame.len() < 6 { return; }
-        if !check_crc(frame) { return; } // cRC errors happen a lot on long RS-485 runs (>15m)
+        if !check_crc(frame) { return; }
 
         let s = frame[0];
         let f = frame[1];
@@ -163,7 +163,6 @@ impl EmulatedTransport {
             0x04 => self.fc04_read_input(frame),
             0x06 => self.fc06_write_single(frame),
             _ => {
-                // exception response: illegal function
                 let mut r = vec![s, f | 0x80, 0x01];
                 push_crc(&mut r);
                 r
@@ -236,8 +235,7 @@ impl EmulatedTransport {
                     self.hold_regs.insert(addr, types::OTA_STATUS_VALIDATING);
 
                     let actual_crc = types::crc32(&self.ota_fw);
-                    // FIXME: should we add a small delay here to simulate flash erase time?
-                    // real devices take ~200ms for the erase cycle
+
                     #[allow(clippy::cast_possible_truncation, reason = "firmware size is always well under 4GB")]
                     if actual_crc == self.ota_crc && self.ota_fw.len() as u32 == self.ota_sz {
                         let cur = self.hold_regs.get(&types::REG_FIRMWARE_VERSION).copied().unwrap_or(0x0100);
@@ -251,7 +249,6 @@ impl EmulatedTransport {
                     self.ota_active = false;
                 }
                 types::OTA_CMD_ABORT => {
-                    // user cancelled or timeout, just reset everything
                     self.ota_active = false;
                     self.ota_fw.clear();
                     self.hold_regs.insert(addr, types::OTA_STATUS_IDLE);
@@ -305,8 +302,7 @@ impl std::fmt::Debug for EmulatedTransport {
     }
 }
 
-// asyncRead, the "serial port" read side. Returns response bytes that were
-// queued up by process_frame() 
+// asyncRead
 impl AsyncRead for EmulatedTransport {
     fn poll_read(
         self: Pin<&mut Self>,

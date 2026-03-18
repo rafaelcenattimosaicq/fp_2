@@ -1,94 +1,134 @@
+/* eslint-disable prefer-const */
+/* eslint-disable no-var */
+// TelemetryContext 
+
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
+  createContext, useContext, useEffect,
+  useState, useCallback,
 } from 'react';
 import type { ReactNode } from 'react';
 import { useMqtt } from './MqttContext';
 import { parseTelemetry } from '../utils/parseTelemetry';
 import type { TelemetryPoint, Device } from '../types';
 
-const BUFFER_MS = 5 * 60 * 1000;
 
-// if no data in 10s, device is offline
-const OFFLINE_MS = 10_000;
+var JANELA_MS = 5 * 60 * 1000;
 
-const GATEWAY_TOPIC = 'controller_app/events';
 
-interface TelemetryProviderProps {
-  children: ReactNode;
-}
+const LIMIAR_OFFLINE = 10_000;
 
-// shared buffer outside component bc useState initializer runs twice in strict mode
-// and the cleanup from the first render would wipe the data
-// react makes this annoying
-let sharedBuffer = new Map<string, TelemetryPoint[]>();
 
-const TelemetryContext = createContext<{
+var LIMIAR_STALE = 30_000;
+
+
+var COMPRESSOR_REGISTERS = ['STATUS_ID_COMP_SPEED', 'STATUS_ID_COMP_POWER', 'STATUS_ID_TEMP_CABINET', 'STATUS_ID_TEMP_DISCHARGE', 'STATUS_ID_TEMP_SUCTION', 'STATUS_ID_TEMP_CONDENSER'];
+var WIND_TURBINE_REGISTERS = ['STATUS_ID_RPM', 'STATUS_ID_POWER', 'STATUS_ID_WIND_SPEED', 'STATUS_ID_ROTOR_TEMP'];
+
+// the gateway publishes all Modbus/wind-turbine readings on this single topic
+var TOPICO_GW = 'controller_app/events';
+
+let _deviceTypes: Record<string, 'compressor' | 'wind_turbine' | 'unknown'> = {};
+
+// --- shared buffer ---
+
+let _bufTelemetria = new Map<string, TelemetryPoint[]>();
+
+// --- React context and provider ---
+
+interface TelProviderProps { children: ReactNode }
+
+const Ctx = createContext<{
   devices: Device[];
   buffers: Map<string, TelemetryPoint[]>;
   selectedDeviceId: string | null;
   selectDevice: (id: string | null) => void;
 } | null>(null);
 
-export function TelemetryProvider({
-  children,
-}: TelemetryProviderProps): React.JSX.Element {
+export function TelemetryProvider({ children }: TelProviderProps): React.JSX.Element {
   const { subscribe } = useMqtt();
   const [devices, setDevices] = useState<Device[]>([]);
-  const [buffers, setBuffers] = useState<Map<string, TelemetryPoint[]>>(
-    () => new Map(),
-  );
+  const [buffers, setBuffers] = useState<Map<string, TelemetryPoint[]>>(() => new Map());
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   useEffect(() => {
-    // reset on hot reload so old session doesnt bleed through
-    sharedBuffer = new Map<string, TelemetryPoint[]>();
+    // reset on hot-reload so stale Modbus readings don't bleed through
+    _bufTelemetria = new Map<string, TelemetryPoint[]>();
+    _deviceTypes = {};
 
-    const unsubscribe = subscribe(GATEWAY_TOPIC, (_topic, payload) => {
-      const point = parseTelemetry(payload);
-      if (!point) return;
+    const unsub = subscribe(TOPICO_GW, (_topic, payload) => {
+      const pt = parseTelemetry(payload);
+      if (!pt) return;
 
-      const { deviceId } = point;
-      const now = Date.now();
+      var devId = pt.deviceId;
+      var agora = Date.now();
+      const existing = _bufTelemetria.get(devId) ?? [];
 
-      const existing = sharedBuffer.get(deviceId) ?? [];
 
-      // skip duplicate timestamps (broker retry when ACK lost)
-      const lastTs = existing.length > 0 ? existing[existing.length - 1].timestamp : 0;
-      if (point.timestamp === lastTs) return;
+      if (!_deviceTypes[devId]) {
+        let valKeys = Object.keys(pt.values);
+        let isCompressor = valKeys.some(k => COMPRESSOR_REGISTERS.indexOf(k) !== -1);
+        let isTurbine = valKeys.some(k => WIND_TURBINE_REGISTERS.indexOf(k) !== -1);
+        if (isCompressor) {
+          _deviceTypes[devId] = 'compressor';
+          console.debug('[tel] detected compressor device:', devId, '(has STATUS_ID_COMP_* registers)');
+        } else if (isTurbine) {
+          _deviceTypes[devId] = 'wind_turbine';
+          console.debug('[tel] detected wind turbine device:', devId);
+        } else {
+          _deviceTypes[devId] = 'unknown';
+        }
+      }
 
-      existing.push(point);
 
-      // trim old points outside buffer window
-      const cutoff = now - BUFFER_MS;
-      const trimmed = existing.filter((p) => p.timestamp >= cutoff);
-      sharedBuffer.set(deviceId, trimmed);
+      var tsUltimo = existing.length > 0 ? existing[existing.length - 1].timestamp : 0;
+      if (tsUltimo > 0 && (agora - tsUltimo) > LIMIAR_STALE) {
+        console.warn('[tel] device', devId, 'was offline for', Math.round((agora - tsUltimo) / 1000), 's — possible RS485 disconnect or gateway restart');
+      }
 
-      setBuffers(new Map(sharedBuffer));
+      if (pt.timestamp === tsUltimo) return;
 
-      // console.log("debug telemetry", deviceId, trimmed.length)
-      setDevices(
-        Array.from(sharedBuffer.entries()).map(([id, buf]) => {
-          const lastPoint = buf[buf.length - 1] ?? null;
-          return {
-            id,
-            name: id,
-            lastSeen: lastPoint?.timestamp ?? 0,
-            online: now - (lastPoint?.timestamp ?? 0) < OFFLINE_MS,
-            lastPoint,
-            latitude: lastPoint?.latitude,
-            longitude: lastPoint?.longitude,
-          };
-        }),
-      );
+
+      if (pt.timestamp > agora + 60_000) {
+        console.warn('[tel] rejecting future timestamp from', devId, '— ESP32 RTC drift?');
+        return;
+      }
+      if (pt.timestamp < agora - JANELA_MS * 2) {
+        //  old data point, ignore it
+        return;
+      }
+
+      existing.push(pt);
+
+      // trim to rolling window
+      const corte = agora - JANELA_MS;
+      var trimmed = existing.filter((p) => p.timestamp >= corte);
+      _bufTelemetria.set(devId, trimmed);
+
+      var lista: Device[] = [];
+      for (const [id, pontos] of _bufTelemetria) {
+        var ultimo = pontos.length > 0 ? pontos[pontos.length - 1] : null;
+        var lastSeen = ultimo?.timestamp ?? 0;
+        var isOnline = agora - lastSeen < LIMIAR_OFFLINE;
+
+        var isStale = !isOnline && (agora - lastSeen < LIMIAR_STALE);
+        lista.push({
+          id: id,
+          name: id,  // FIXME: resolve friendly name from NES device registry
+          lastSeen: lastSeen,
+          online: isOnline || isStale,
+          lastPoint: ultimo,
+          latitude: ultimo?.latitude,
+          longitude: ultimo?.longitude,
+        });
+      }
+
+      setBuffers(new Map(_bufTelemetria));
+      setDevices(lista);
     });
 
     return () => {
-      unsubscribe();
-      sharedBuffer = new Map();
+      unsub();
+      _bufTelemetria = new Map();
     };
   }, [subscribe]);
 
@@ -97,14 +137,9 @@ export function TelemetryProvider({
   }, []);
 
   return (
-    <TelemetryContext.Provider value={{
-      devices,
-      buffers,
-      selectedDeviceId,
-      selectDevice,
-    }}>
+    <Ctx.Provider value={{ devices, buffers, selectedDeviceId, selectDevice }}>
       {children}
-    </TelemetryContext.Provider>
+    </Ctx.Provider>
   );
 }
 
@@ -115,9 +150,9 @@ export const useTelemetry = (): {
   selectedDeviceId: string | null;
   selectDevice: (id: string | null) => void;
 } => {
-  const ctx = useContext(TelemetryContext);
+  const ctx = useContext(Ctx);
   if (!ctx) {
-    throw new Error('useTelemetry must be used within a TelemetryProvider');
+    throw new Error('useTelemetry called outside TelemetryProvider — check App.tsx wrapper order');
   }
   return ctx;
 };

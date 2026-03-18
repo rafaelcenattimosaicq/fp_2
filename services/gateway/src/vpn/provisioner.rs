@@ -1,11 +1,7 @@
 use super::fingerprint::HardwareFingerprint;
 use std::time::Duration;
 
-// provisioner response has grown over time, originally it was just the auth key
-// and the tailnet name. coordinator_host/ports were added when we moved the
-// coordinator off a static EC2 to Fargate (IPs change on every deploy).
-// mqtt_broker_host came even later when we started running the broker on a
-// separate task instead of sidecar.
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ProvisionResponse {
     pub auth_key: String,
@@ -36,9 +32,6 @@ pub enum ProvisionError {
     Api { status: u16, body: String },
 }
 
-// kept separate from poll because submit needs to build the JSON body with
-// the fingerprint + optional secret, and the error handling is different
-// (submit failing is fatal, poll failing just means "try again later")
 pub async fn submit_vpn_request(
     base_url: &str,
     gw_id: &str,
@@ -55,9 +48,7 @@ pub async fn submit_vpn_request(
         data["pre_shared_secret"] = s.into();
     }
 
-    // lambda cold-start behind API GW is ~8s worst case.
-    // 10s timeout caused intermittent failures on the Joinville pilot,
-    // bumped to 15 after that.
+
     let r = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()?
@@ -87,8 +78,7 @@ pub async fn poll_vpn_status(
 ) -> Result<PollResult, ProvisionError> {
     let u = format!("{}/vpn/poll/{token}", base_url.trim_end_matches('/'));
 
-    // poll can use a shorter timeout, if the lambda is warm it responds in <1s,
-    // and if it's cold we'll just retry on the next 5s cycle anyway
+
     let r = reqwest::Client::builder()
         .timeout(Duration::from_secs(8))
         .build()?
@@ -106,8 +96,7 @@ pub async fn poll_vpn_status(
 
     let v: serde_json::Value = r.json().await?;
 
-    // older provisioner lambda (pre-march 2026) sometimes omits "status"
-    // entirely for pending requests. treat missing as pending.
+
     match v["status"].as_str() {
         Some("approved") => {
             let x: ProvisionResponse = serde_json::from_value(v).map_err(|e| {
@@ -124,9 +113,6 @@ pub async fn poll_vpn_status(
 mod tests {
     use super::*;
 
-    // spins up a throwaway TCP server that accepts one request and sends
-    // back a canned JSON response. janky but it works and doesn't need
-    // an HTTP framework as a dev dependency.
     #[tokio::test]
     async fn submit_includes_secret_and_fingerprint() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

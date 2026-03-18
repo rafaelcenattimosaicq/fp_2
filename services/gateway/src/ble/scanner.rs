@@ -35,9 +35,7 @@ pub async fn scan_ble_devices(state: &SharedState) {
         }
     };
 
-    // filter to NUS service so we don't get flooded with every BLE device in range.
-    // in the Joinville factory there were 40+ random BLE devices visible (phones,
-    // headphones, etc), UI was unusable without this filter.
+
     let f = ScanFilter { services: vec![super::NUS_SERVICE_UUID] };
     if a.start_scan(f).await.is_err() {
         return;

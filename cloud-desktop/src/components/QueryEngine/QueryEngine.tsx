@@ -13,7 +13,7 @@ import styles from './QueryEngine.module.css';
 // view streaming results.  The coordinator runs on ECS Fargate so we
 // occasionally see 502 errors during rolling deployments; the submit
 export function QueryEngine(): React.JSX.Element {
-  const { sources, queries, submitQuery, removeQuery, loadingSources, selectedDevices, setSelectedDevices } = useQuery();
+  const { sources, queries, submitQuery, removeQuery, renameQuery, loadingSources, selectedDevices, setSelectedDevices } = useQuery();
   const { devices } = useTelemetry();
   const [submitting, setSubmitting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -91,7 +91,7 @@ export function QueryEngine(): React.JSX.Element {
             defaults={prefs}
           />
         )}
-        <QueryResultsList queries={visibleQueries} onRemove={removeQuery} />
+        <QueryResultsList queries={visibleQueries} onRemove={removeQuery} onRename={renameQuery} />
       </div>
     </>
   );

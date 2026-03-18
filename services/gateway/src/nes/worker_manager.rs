@@ -5,18 +5,12 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
-// backoff starts at 1s, doubles up to 30s. Jitter ceiling picked by trial and
-// error, 1500ms was enough to stagger 8 RPis rebooted simultaneously during
-// the Joinville field test without being so large that a single gateway waits
-// too long on a quiet network.
+
 const INIT_BACKOFF: Duration = Duration::from_secs(1);
 const MAX_BACKOFF: Duration = Duration::from_secs(30);
 const JITTER_CEIL_MS: u64 = 1500;
 const PORT_WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// main entry point, runs the NES worker Docker container in a supervised
-/// restart loop. Waits for the coordinator to come up before each launch
-/// so we don't burn through backoff retries against a cold ECS Fargate task.
 #[allow(clippy::too_many_lines, reason = "container launch logic is inherently sequential; splitting would hurt readability")]
 pub async fn run_worker_manager(
     wk_cfg: &WorkerConfig,
@@ -26,7 +20,6 @@ pub async fn run_worker_manager(
 ) {
     use std::process::Command as StdCmd;
     let mut backoff = INIT_BACKOFF;
-    // coordinator REST is gRPC port + 1 by convention in NES Nautilus
     let coord_rest = wk_cfg.coordinator_rest_url.clone().unwrap_or_else(|| {
         format!(
             "http://{}:{}",
@@ -36,7 +29,6 @@ pub async fn run_worker_manager(
     });
 
     loop {
-        // dump the YAML to a temp file so we can bind-mount it into the container
         let cfg_path = match dump_worker_yaml(wk_cfg, schema) {
             Ok(p) => p,
             Err(e) => {
@@ -49,7 +41,6 @@ pub async fn run_worker_manager(
 
         poll_coordinator_ready(&coord_rest, &gw_state).await;
 
-        // --- spawn the container and tail its logs until it exits ---
         let cname = format!("nes-worker-{gw_id}");
         kill_gateway_nes_container(&cname).await;
 
@@ -61,10 +52,7 @@ pub async fn run_worker_manager(
         }
 
         // on real Linux (RPi) we use host networking so the worker can bind to
-        // the Tailscale IP directly. On macOS Docker Desktop the Tailscale IP
-        // doesn't exist inside the container so we use bridge + port mapping +
-        // bind_any.so LD_PRELOAD shim that intercepts bind() and replaces
-        // the Tailscale IP with 0.0.0.0.
+        // the Tailscale IP directly. 
         let host_net = cfg!(target_os = "linux")
             || std::env::var("NES_FORCE_HOST_NETWORK").is_ok_and(|v| v == "1");
 
@@ -83,10 +71,7 @@ pub async fn run_worker_manager(
         let bind_so = locate_shim("bind_any.so");
         let bind_mount = bind_so.as_ref().map(|p| format!("{p}:/opt/bind_any.so:ro"));
 
-        // gRPC C core on ARM64 does an epoll_wait(timeout=0) busy-loop that pins
-        // a CPU core at 100%. Found this the hard way when a Pi4 at the Joinville
-        // plant thermal-throttled after 20 minutes. The epoll_timeout.so shim
-        // patches epoll_wait to use a minimum 1ms timeout.
+        // gRPC C core on ARM64 does an epoll_wait(timeout=0)
         let epoll_so = locate_shim("epoll_timeout.so");
 
         let t0 = std::time::Instant::now();
@@ -107,8 +92,7 @@ pub async fn run_worker_manager(
                 continue;
             }
 
-            // host networking + some docker versions don't support -v at create
-            // time, so we docker-cp the config into the stopped container
+            // host networking + some docker versions don't support
             let cp_dst = format!("{cname}:{container_cfg}");
             let _ = StdCmd::new("docker").args(["cp", &cfg_path, &cp_dst]).output();
 
@@ -118,7 +102,6 @@ pub async fn run_worker_manager(
             }
 
         } else {
-            // bridge mode, need explicit port mappings + bind_any shim
             let mut args: Vec<&str> = vec!["create", "--name", &cname];
             args.extend_from_slice(&["-p", &rpc_map, "-p", &data_map]);
             if let Some(ref m) = bind_mount {
@@ -129,8 +112,7 @@ pub async fn run_worker_manager(
         }
         let _ = StdCmd::new("docker").args(["start", &cname]).output();
 
-        // tail the container logs so the desktop UI can show NES output without
-        // having to SSH into the Pi
+        // tail the container
         let mut child = match Command::new("docker")
             .args(["logs", "-f", &cname])
             .stdout(std::process::Stdio::piped())
@@ -159,8 +141,7 @@ pub async fn run_worker_manager(
                 }
             });
         }
-        // stderr gets Warn level, most of it is NES debug spam but occasionally
-        // there's a real SIGSEGV or gRPC error buried in there
+        // stderr gets Warn level
         if let Some(stderr) = child.stderr.take() {
             let st = gw_state.clone();
             tokio::spawn(async move {
@@ -187,9 +168,6 @@ pub async fn run_worker_manager(
         let uptime = t0.elapsed();
         let _ = std::fs::remove_file(&cfg_path);
 
-        // if worker lived >30s the coordinator was probably healthy at launch.
-        // reset backoff so the next attempt doesn't wait needlessly after a
-        // legitimate crash (OOM, SIGSEGV, etc.)
         if uptime > Duration::from_secs(30) {
             backoff = INIT_BACKOFF;
         }
@@ -210,28 +188,15 @@ fn dump_worker_yaml(wk_cfg: &WorkerConfig, schema: Option<&NesSchema>) -> Result
     Ok(out)
 }
 
-/// build the YAML config that the NES worker binary reads at startup.
-/// coordinatorHost/Port, physical source, MQTT settings all come from the
-/// gateway config; the logical source name can be overridden by the runtime
-/// schema to include the gateway suffix (e.g. `telemetry_0x0007`).
 pub fn generate_worker_yaml(wk_cfg: &WorkerConfig, schema: Option<&NesSchema>) -> String {
     let src_name = schema.map_or(
         wk_cfg.logical_source_name.as_str(),
         |s| s.logical_source_name.as_str(),
     );
 
-    // topic includes source name so each gateway publishes to its own MQTT topic
     let mqtt_topic = format!("telemetry/nes/{src_name}");
 
-    // numberOfSlots must be > 0 for query deployment. 65535 is the max and
-    // we just use that because there's no real cost to having more slots
-    // than queries. The coordinator assigns slots lazily.
-    //
-    // fixed rpc/data ports prevent stale health-check entries on the coordinator.
-    // when ports are 0 (ephemeral), each worker restart picks a new port and the
-    // coordinator never cleans up old entries, found 34 orphaned entries during
-    // the Joinville incident. Using fixed ports means re-registrations reuse
-    // the same address.
+
     format!(
         r#"logLevel: LOG_DEBUG
 coordinatorHost: {coord_host}
@@ -267,11 +232,9 @@ physicalSources:
     )
 }
 
-/// poll coordinator REST health until it returns 200. Blocks forever --
-/// the outer restart loop handles timeouts via backoff.
+
 async fn poll_coordinator_ready(rest_url: &str, st: &SharedState) {
     let url = format!("{rest_url}/v1/nes/connectivity/check");
-    // unwrap_or_default is fine here, worst case we get a client with no TLS
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
@@ -294,30 +257,24 @@ async fn poll_coordinator_ready(rest_url: &str, st: &SharedState) {
 
 fn bump_backoff(cur: Duration) -> Duration {
     let base = (cur * 2).min(MAX_BACKOFF);
-    // jitter so N gateways rebooted simultaneously by an ECS deploy
-    // don't all slam the coordinator REST API at the exact same instant
+
     let jitter = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| u64::from(d.subsec_millis()) % JITTER_CEIL_MS);
     base + Duration::from_millis(jitter)
 }
 
-/// convenience wrapper, every callsite was doing the same
-/// `state.write().unwrap().push_log(...)` dance and it was getting old.
+
 fn push_log(st: &SharedState, lvl: LogLevel, msg: impl Into<String>) {
     let text = msg.into();
     if matches!(lvl, LogLevel::Error) {
         tracing::warn!("{text}");
     }
-    // .unwrap() is intentional, if the lock is poisoned we want to crash
-    // rather than silently lose log messages. The RwLock only poisons if the
-    // modbus poller panics, which means the whole gateway is toast anyway.
+
     st.write().unwrap().push_log(lvl, text);
 }
 
-/// kill any leftover container from a previous run. This happens when the
-/// gateway binary is `SIGKILLed` (e.g. systemd stop timeout exceeded) and
-/// the container outlives the gateway process.
+
 pub async fn kill_gateway_nes_container(cname: &str) {
     let found = Command::new("docker")
         .args(["ps", "-aq", "--filter", &format!("name=^{cname}$")])
@@ -345,11 +302,9 @@ async fn wait_ports_available(rpc: u16, data: u16, st: &SharedState) -> bool {
     }
 }
 
-/// search for an `LD_PRELOAD` shim (.so) next to the gateway binary, then
-/// fall back to cwd. Returns None if neither location has it.
+
 fn locate_shim(name: &str) -> Option<String> {
-    // check next to running binary first (works for .deb installs where
-    // the shim lives in /usr/lib/gateway/nes-bind-override/)
+
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let p = dir.join("nes-bind-override").join(name);
@@ -358,7 +313,6 @@ fn locate_shim(name: &str) -> Option<String> {
             }
         }
     }
-    // cwd fallback for development layout (cargo run from services/gateway/)
     let cwd = std::path::Path::new("nes-bind-override").join(name);
     if cwd.exists() {
         if let Ok(abs) = cwd.canonicalize() {
@@ -370,15 +324,13 @@ fn locate_shim(name: &str) -> Option<String> {
 }
 
 async fn port_in_use(port: u16) -> bool {
-    // ss is faster but only available on Linux
     if let Ok(o) = Command::new("ss")
         .args(["-tln", &format!("sport = :{port}")])
         .output().await
     {
         let out = String::from_utf8_lossy(&o.stdout);
-        return out.lines().count() > 1; // header line + at least one listener
+        return out.lines().count() > 1; 
     }
-    // macOS fallback, lsof is slower but always available
     if let Ok(o) = Command::new("lsof")
         .args(["-iTCP", "-sTCP:LISTEN", "-P", "-n"])
         .output().await
@@ -393,10 +345,6 @@ async fn port_in_use(port: u16) -> bool {
 mod tests {
     use super::*;
 
-    // make sure the YAML we hand to the NES worker binary has all required
-    // fields. A missing coordinatorPort once caused a 20-minute debug session
-    // on a Pi that had no display attached, had to reflash the SD card
-    // because the worker kept crashing in a tight loop filling /tmp.
     #[test]
     fn yaml_has_all_required_nes_fields() {
         let cfg = WorkerConfig {
@@ -438,8 +386,7 @@ mod tests {
         assert!(yaml.contains("logLevel: LOG_DEBUG"));
     }
 
-    // backoff roughly doubles each iteration. Jitter adds up to 1.5s, so
-    // check a range rather than exact values.
+
     #[test]
     fn backoff_doubles_up_to_cap() {
         let ceil = Duration::from_millis(JITTER_CEIL_MS);
@@ -485,9 +432,7 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
-    // when a NesSchema is provided its logical_source_name should override
-    // the one from WorkerConfig. This is how the gateway_id suffix gets
-    // propagated into the worker YAML so each RPi has a unique source name.
+
     #[test]
     fn schema_overrides_logical_source() {
         let cfg = WorkerConfig {

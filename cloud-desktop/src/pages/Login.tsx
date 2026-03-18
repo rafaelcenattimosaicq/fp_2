@@ -1,10 +1,6 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router';
-import { QRCodeSVG } from 'qrcode.react';
-import {signOut as amplifySignOut} from 'aws-amplify/auth';
-import { useAuth } from '../contexts/AuthContext';
-import styles from '../styles/login.module.css';
+/*
+ * Login */
+const EMBRACO_MIN_PW_LENGTH = 12;
 
 type LoginStep = 'credentials' | 'newPassword' | 'mfaSetup' | 'mfa';
 
@@ -24,9 +20,28 @@ function getSubtitle(s: LoginStep): string {
   }
 }
 
+export function meetsPasswordPolicy(pw: string): boolean {
+  if (pw.length < EMBRACO_MIN_PW_LENGTH) return false;
+  let hasUpper = false, hasLower = false, hasDigit = false;
+  for (const ch of pw) {
+    if (ch >= 'A' && ch <= 'Z') hasUpper = true;
+    if (ch >= 'a' && ch <= 'z') hasLower = true;
+    if (ch >= '0' && ch <= '9') hasDigit = true;
+  }
+  return hasUpper && hasLower && hasDigit;
+}
+
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { useNavigate } from 'react-router';
+import { QRCodeSVG } from 'qrcode.react';
+import {signOut as amplifySignOut} from 'aws-amplify/auth';
+import { useAuth } from '../contexts/AuthContext';
+import styles from '../styles/login.module.css';
+
 export function Login(): React.JSX.Element {
   const { signIn, confirmMfa, completeNewPassword, status } = useAuth();
-  var navigate = useNavigate();
+  const navigate = useNavigate();
 
   const [step, setStep] = useState<LoginStep>('credentials');
   const [email, setEmail] = useState('');
@@ -106,7 +121,6 @@ export function Login(): React.JSX.Element {
     }
   }
 
-  // handle both mfa steps with the same function
   async function handleMfa(e: FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
@@ -115,7 +129,7 @@ export function Login(): React.JSX.Element {
       await confirmMfa(mfaCode);
       navigate('/', { replace: true });
     } catch(err) {
-      var msg = err instanceof Error ? err.message : 'Invalid MFA code';
+      const msg = err instanceof Error ? err.message : 'Invalid MFA code';
 
       if (msg.includes('signIn was not called') || msg.includes('session has expired') || msg.includes('CodeMismatchException')) {
         setStep('credentials');

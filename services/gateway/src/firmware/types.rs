@@ -1,45 +1,29 @@
-// register map for OTA firmware update. Addresses were reverse-engineered from
-// the client's Windows flasher (see also services/esp32-firmware/). The official docs only mention 60000-60009 for
-// "device identity". Everything above 60100 is bootloader-specific and NOT in
-// any datasheet I could find.
 
-/// firmware version lives at 60001 (NOT 60000, that's the device model ID).
-/// format: major in high byte, minor in low byte. e.g. 0x0201 = v2.01
 pub const REG_FIRMWARE_VERSION: u16 = 60001;
 
-// OTA control/status register. Writing commands here, reading status back.
-// The bootloader re-uses the same register for both which is a design choice.
+
 pub const REG_OTA_CONTROL: u16 = 60100;
 
-// firmware size split across two 16-bit regs (big-endian). I spent two hours
-// debugging because I initially assumed little-endian like the rest of Modbus.
-// nope. the client's bootloader is big-endian for the size field only. Cool.
+
 pub const REG_FW_SIZE_HIGH: u16 = 60101;
 pub const REG_FW_SIZE_LOW: u16 = 60102;
 
-// cRC32 of the entire firmware blob, also big-endian split.
 pub const REG_CRC_HIGH: u16 = 60103;
 pub const REG_CRC_LOW: u16 = 60104;
 
-// data window: 128 consecutive holding registers = 256 bytes per chunk.
-// the bootloader expects you to fill the entire window before signaling
-// "chunk ready". Partial writes cause silent corruption, no error, just
-// a bricked board. Ask me how I know.
+
 pub const REG_DATA_WINDOW_START: u16 = 60105;
 pub const REG_DATA_WINDOW_END: u16 = 60232;
 
-/// 256 bytes per chunk. This matches what the Windows flasher sends.
-/// tried 512 once, bootloader just ignores the extra registers.
+
 pub const CHUNK_SIZE: usize = 256;
 
 #[cfg(test)]
 const DATA_WINDOW_REGISTERS: u16 = REG_DATA_WINDOW_END - REG_DATA_WINDOW_START + 1;
 
-// oTA commands written to REG_OTA_CONTROL
 pub const OTA_CMD_START: u16 = 1;
 pub const OTA_CMD_COMMIT: u16 = 2;
 pub const OTA_CMD_ABORT: u16 = 3;
-// chunk acknowledgment is 0x10 + chunk_index, handled inline in ota.rs
 
 // oTA status values read back from REG_OTA_CONTROL
 pub const OTA_STATUS_IDLE: u16 = 0;
@@ -47,11 +31,7 @@ pub const OTA_STATUS_RECEIVING: u16 = 1;
 pub const OTA_STATUS_VALIDATING: u16 = 2;
 pub const OTA_STATUS_SUCCESS: u16 = 3;
 pub const OTA_STATUS_ERROR: u16 = 4;
-// FIXME: there might be a status 5 ("erasing flash") that I saw once in a
-// wireshark capture but couldn't reproduce. Ignoring for now.
 
-/// uI-facing OTA status. This gets shown in the dashboard panel so the user
-/// knows what's going on during a flash that can take 2+ minutes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OtaStatus {
     Idle,
@@ -84,11 +64,9 @@ impl std::fmt::Display for OtaStatus {
     }
 }
 
-/// cRC32 (ISO 3309 / ITU-T V.42). The bootloader checks this before committing
-/// the flash. Polynomial 0xEDB88320 (reflected). I verified the output against
-/// the `crc32` command on Linux and against binutils for a known .bin file.
+
 pub fn crc32(data: &[u8]) -> u32 {
-    // standard reflected CRC32, nothing fancy
+    // standard reflected CRC32
     let mut v: u32 = 0xFFFF_FFFF;
     for &x in data {
         v ^= u32::from(x);
@@ -113,7 +91,6 @@ mod tests {
         assert_eq!(crc32(&[]), 0x0000_0000);
     }
 
-    // checked against: echo -n "hello" | crc32 (from libarchive-tools)
     #[test]
     fn crc32_hello() {
         assert_eq!(crc32(b"hello"), 0x3610_A686, "mismatch vs linux crc32 tool");
@@ -130,7 +107,6 @@ mod tests {
         assert_eq!(crc32(&[0xFF_u8]), 0xFF00_0000);
     }
 
-    // make sure version formatting round-trips correctly
     #[test]
     fn display_success_version_encoding() {
         let s = OtaStatus::Success { new_version: 0x0201 };
@@ -163,9 +139,7 @@ mod tests {
         assert_eq!(format!("{s}"), "Failed: CRC mismatch");
     }
 
-    // all registers must be in the 60000+ range (the client "extended" block).
-    // this caught a copy-paste bug once where I accidentally wrote 6010 instead
-    // of 60100.
+
     #[test]
     fn registers_in_extended_block() {
         assert!(REG_FIRMWARE_VERSION >= 60000);
@@ -185,7 +159,6 @@ mod tests {
         assert_eq!(DATA_WINDOW_REGISTERS as usize * 2, CHUNK_SIZE);
     }
 
-    // paranoia: the constants must not collide
     #[test]
     fn ota_commands_distinct() {
         let cmds = [OTA_CMD_START, OTA_CMD_COMMIT, OTA_CMD_ABORT];
@@ -207,8 +180,7 @@ mod tests {
         }
     }
 
-    // register layout: control < size < crc < data window
-    // if these ever get reordered the bootloader will silently accept garbage.
+
     #[test]
     fn register_ordering() {
         assert!(REG_OTA_CONTROL < REG_FW_SIZE_HIGH);

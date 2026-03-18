@@ -1,14 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { parseTelemetry } from './parseTelemetry';
 
-/**
- * Tests for parseTelemetry - mostly added after finding edge cases
- * that broke the real-time dashboard in production.
- */
+
 describe('parseTelemetry', () => {
-  // bug: gateway occasionally sent an empty JSON object when the Modbus
-  // read timed out. The dashboard crashed with "Cannot read property
-  // 'toFixed' of undefined" because values was expected to be populated.
+
   it('returns a point with empty values when payload has no numeric fields', () => {
     const result = parseTelemetry('{}');
 

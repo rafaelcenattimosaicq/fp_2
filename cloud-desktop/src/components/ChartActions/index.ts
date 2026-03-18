@@ -4,14 +4,10 @@ export type {
 
 export { formatDuration, CURSOR_COLORS } from './types';
 
-export { useChartControls } from './useChartControls';
+export { useSensorChartControls as useChartControls } from './useChartControls';
 export { useDualCursors } from './useDualCursors';
-export { useCursorDrag } from './useCursorDrag';
-export { useYAxisZoom } from './useYAxisZoom';
+export { isWithinHitZone } from './useCursorDrag';
 
 export { computeCursorStats } from './computeCursorStats';
-export { isWithinHitZone } from './useCursorDrag';
-export { getHoveredYAxisIndex, computeZoomedRange } from './useYAxisZoom';
 
-export { ChartControls } from './ChartControls';
 export { CursorStatsPanel } from './CursorStatsPanel';

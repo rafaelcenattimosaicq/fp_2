@@ -31,7 +31,7 @@ export function AlertsFeed(): React.JSX.Element {
         }
     }, []);
 
-    const visibleFeed = useMemo(() => feed.slice(0, MAX_VISIBLE), [feed]);
+    const visibleFeed = useMemo(() => feed.filter((item: FeedItem) => item.type === 'alert').slice(0, MAX_VISIBLE), [feed]);
 
     useEffect(() => {
         if (feed.length > MAX_VISIBLE && !warnedOverflow.current) {

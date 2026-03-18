@@ -32,7 +32,6 @@ pub async fn request_enrollment(
         enrollment_token: &cfg.enrollment_token,
     };
 
-    // TODO: add retry with backoff
     Client::new()
         .post(&u)
         .json(&b)

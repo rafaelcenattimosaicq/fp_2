@@ -4,44 +4,62 @@ import { useAlerts } from '../../contexts/AlertsContext';
 import styles from './AlertRuleForm.module.css';
 
 const OPS = ['>', '<', '>=', '<=', '=', '!='];
-
+// these fields come from the NES schema and shouldn't be selectable as alert targets
 const META = new Set(['DEVICE_ID', 'GATEWAY_ID', 'timestamp']);
 
 export function AlertRuleForm(): React.JSX.Element {
     const { sources } = useQuery();
     const { addRule } = useAlerts();
 
-    const [src, setSrc] = useState('');
+    const [sel, setSel] = useState('');
     const [field, setField] = useState('');
     const [op, setOp] = useState('>');
-    const [thresh, setThresh] = useState('');
-    // tracks whether an addRule() call is in-flight so we can disable
+    const [threshold, setThreshold] = useState('');
+    const [actionReg, setActionReg] = useState('');
+    const [actionVal, setActionVal] = useState('');
+    const [actionGw, setActionGw] = useState('GW-EDGE-001');
+    const [showAction, setShowAction] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    const selSrc = sources.find((s) => s.name === src);
-    const flds = selSrc
-      ? selSrc.fields.filter((f) => !META.has(f))
-      : [];
+    const matched = sources.find((s) => s.name === sel);
+    // writable registers start with PARAM_ (read-only ones are STATUS_ID_*)
+    const writableRegs = matched
+        ? matched.fields.filter(f => f.startsWith('PARAM_'))
+        : [];
+    // also add common writable registers that might not be in the schema
+    // (the gateway descriptor has them even if NES source doesn't)
+    const EXTRA_WRITABLE = ['PARAM_MOTOR_COMMAND', 'PARAM_MOTOR_SPEED', 'PARAM_TH_SETPOINT', 'PARAM_FAN_SPEED'];
+    const allWritable = [...new Set([...writableRegs, ...EXTRA_WRITABLE])];
 
-    function handleSourceChange(val: string) {
-        setSrc(val);
-        setField('');  // reset, fields differ per source
+    function handleSourceChange(x: string){
+        setSel(x);
+        setField('');
     }
 
-    const trimmed = thresh.trim();
-    const canSubmit = src && field && trimmed !== '' && !submitting;
+    const canSubmit = sel !== '' && field !== '' && threshold.trim() !== '' && !submitting;
 
-    // rule just shows "ERR" badge which confused some
-    async function handleSubmit() {
+    async function doSubmit(){
         if (!canSubmit) return;
-        if (op !== '=' && op !== '!=' && Number.isNaN(Number(trimmed))) return;
+
+        // only validate numeric for non equality ops
+        if(op !== '=' && op !== '!='){
+            if(Number.isNaN(Number(threshold.trim()))) return;
+        }
 
         setSubmitting(true);
         try {
-            await addRule(src, field, op, trimmed);
+            // console.log('submitting rule:', sel, field, op, threshold);
+            await addRule(sel, field, op, threshold.trim(), {
+                actionRegisterId: actionReg || undefined,
+                actionValue: actionVal ? Number(actionVal) : undefined,
+                actionGatewayId: actionGw || undefined,
+            });
             setField('');
-            setThresh('');
-        } catch { /* addRule already logs */ }
+            setThreshold('');
+            setActionReg('');
+            setActionVal('');
+        } catch {
+        }
         setSubmitting(false);
     }
 
@@ -50,7 +68,7 @@ export function AlertRuleForm(): React.JSX.Element {
         <div className={styles.row}>
             <select
                 className={styles.select}
-                value={src}
+                value={sel}
                 onChange={(e) => handleSourceChange(e.target.value)}
                 aria-label="Alert source"
             >
@@ -64,11 +82,11 @@ export function AlertRuleForm(): React.JSX.Element {
               className={styles.select}
               value={field}
               onChange={(e) => setField(e.target.value)}
-              disabled={!src}
+              disabled={!sel}
               aria-label="Alert field"
             >
               <option value="">Field...</option>
-              {flds.map((f) => <option key={f} value={f}>{f}</option>)}
+              {(matched ? matched.fields.filter((f) => !META.has(f)) : []).map((f) => <option key={f} value={f}>{f}</option>)}
             </select>
         </div>
 
@@ -86,21 +104,59 @@ export function AlertRuleForm(): React.JSX.Element {
                 className={styles.input}
                 type="text"
                 placeholder="Threshold"
-                value={thresh}
-                onChange={(e) => setThresh(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value)}
+                onKeyDown={(e) => { if(e.key === 'Enter') doSubmit(); }}
                 aria-label="Threshold value"
             />
 
             <button
               type="button"
+              className={styles.actionToggle}
+              onClick={() => setShowAction(!showAction)}
+              title="Add auto-action"
+            >
+              ⚡
+            </button>
+            <button
+              type="button"
               className={styles.addBtn}
               disabled={!canSubmit}
-              onClick={handleSubmit}
+              onClick={doSubmit}
             >
               {submitting ? '...' : '+ Rule'}
             </button>
         </div>
+
+        {showAction && (
+          <div className={styles.actionRow}>
+            <span className={styles.actionLabel}>Action:</span>
+            <select
+              className={styles.actionInput}
+              value={actionReg}
+              onChange={(e) => setActionReg(e.target.value)}
+            >
+              <option value="">Register...</option>
+              {allWritable.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <input
+                className={styles.actionInput}
+                type="number"
+                placeholder="Value (e.g. 3)"
+                value={actionVal}
+                onChange={(e) => setActionVal(e.target.value)}
+                style={{width: 80}}
+            />
+            <input
+              className={styles.actionInput}
+              type="text"
+              placeholder="Gateway ID"
+              value={actionGw}
+              onChange={(e) => setActionGw(e.target.value)}
+              style={{ width: 120 }}
+            />
+          </div>
+        )}
       </div>
     );
 }

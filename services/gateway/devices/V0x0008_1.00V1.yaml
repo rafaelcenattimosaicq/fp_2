@@ -24,7 +24,7 @@ characteristics:
     max_value: 65535
     is_read_only: true
   - id: PARAM_MOTOR_COMMAND
-    type: unsigned integer
+    type: enum
     name: Motor command
     acronym: CMD
     description: "Motor control: 0=stop, 1=spin forward, 2=reverse, 3=brake"
@@ -33,18 +33,14 @@ characteristics:
     max_value: 3
     default_value: 0
     fields:
-    - name: Stop
-      bit_offset: 0
-      bit_length: 0
-    - name: Forward
-      bit_offset: 0
-      bit_length: 1
-    - name: Reverse
-      bit_offset: 0
-      bit_length: 2
-    - name: Brake
-      bit_offset: 0
-      bit_length: 3
+    - index: 0
+      name: Stop
+    - index: 1
+      name: Forward
+    - index: 2
+      name: Reverse
+    - index: 3
+      name: Brake
   - id: PARAM_MOTOR_SPEED
     type: unsigned integer
     name: Motor speed setpoint
@@ -63,18 +59,14 @@ characteristics:
     address: 200
     is_read_only: true
     fields:
-    - name: Stopped
-      bit_offset: 0
-      bit_length: 0
-    - name: Forward
-      bit_offset: 0
-      bit_length: 1
-    - name: Reverse
-      bit_offset: 0
-      bit_length: 2
-    - name: Braking
-      bit_offset: 0
-      bit_length: 3
+    - index: 0
+      name: Stopped
+    - index: 1
+      name: Forward
+    - index: 2
+      name: Reverse
+    - index: 3
+      name: Braking
   - id: STATUS_ID_MOTOR_SPEED
     type: unsigned integer
     name: Motor actual speed
@@ -86,9 +78,9 @@ characteristics:
     is_read_only: true
   - id: STATUS_ID_MOTOR_RPM
     type: unsigned integer
-    name: Estimated RPM
+    name: Rotor RPM
     acronym: S03
-    description: Estimated motor RPM based on PWM output
+    description: Real RPM from Hall effect sensor (KY-003)
     address: 202
     min_value: 0
     max_value: 10000
@@ -131,6 +123,13 @@ characteristics:
     description: Seconds since boot
     address: 206
     is_read_only: true
+  - id: STATUS_ID_PULSE_COUNT
+    type: unsigned integer
+    name: Hall pulse count
+    acronym: S08
+    description: Total Hall sensor pulses since boot
+    address: 207
+    is_read_only: true
 services:
 - id: SERVICE_DATA_ACQUISITION
   graph_data:
@@ -146,5 +145,6 @@ services:
   - id: STATUS_ID_BUS_VOLTAGE
   - id: STATUS_ID_MOTOR_CURRENT
   - id: STATUS_ID_UPTIME
+  - id: STATUS_ID_PULSE_COUNT
   config_groups: []
   storage_data: []

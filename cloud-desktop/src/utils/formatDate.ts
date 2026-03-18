@@ -1,5 +1,6 @@
+//  Cloud Desktop 
+// DD/MM/YYYY 
 
-// date formatting utils - using manual formatting because Intl was giving weird results on some machines
 
 export function formatDate(val: Date): string {
   const day = val.getDate().toString().padStart(2, '0');
@@ -25,7 +26,6 @@ export function formatDateTime(val: Date): string {
 }
 
 export function formatEpoch(num: number): string {
-  // backend sends epoch in seconds, js expects ms
   return formatDateTime(new Date(num * 1000))
 }
 

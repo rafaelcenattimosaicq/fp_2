@@ -29,7 +29,7 @@ export function Header(): React.JSX.Element {
         </div>
 
         <nav className={styles.tabs} aria-label="Main navigation">
-          {NAV.map(n => <NavLink key={n.to} to={n.to} end={!!n.end}
+          {NAV.map(n => <NavLink key={n.to} to={n.to} end={'end' in n && !!n.end}
             className={tabCls}>{n.label}</NavLink>)}
         </nav>
       </div>

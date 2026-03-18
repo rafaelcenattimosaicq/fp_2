@@ -1,3 +1,4 @@
+/* eslint-disable no-var */
 import { useState, useMemo } from 'react';
 import type { Query, QueryStatus } from '../../types';
 import { EChart } from '../EChart/EChart';
@@ -9,100 +10,117 @@ const META = new Set([
   'start', 'end',
 ]);
 
+const TIME_INTERVALS = [
+  { label: 'All', seconds: 0 },
+  { label: '1m', seconds: 60 },
+  { label: '5m', seconds: 300 },
+  { label: '15m', seconds: 900 },
+  { label: '1h', seconds: 3600 },
+  { label: '6h', seconds: 21_600 },
+];
+
 interface Props {
   query: Query;
   defaultExpanded: boolean;
   onRemove: (id: string) => void;
+  onRename?: (id: string, name: string) => void;
 }
 
+// palette from the design
 const COLOURS = [
   '#00A0B0', '#7defa0', '#f5a623', '#c084fc',
   '#fb7185', '#67e8f9', '#fbbf24', '#a78bfa',
 ];
 
-function badgeCls(st: QueryStatus): string {
-  const m: Record<QueryStatus, string> = {
-    pending: styles.statusPending,
-    running: styles.statusRunning,
-    completed: styles.statusCompleted,
-    failed: styles.statusFailed,
-    stopped: styles.statusStopped,
-  };
-  return `${styles.badge} ${m[st]}`;
-}
-
-function getCols(rows: Record<string, unknown>[]): string[] {
-  if (rows.length === 0) return [];
-  return Object.keys(rows[0]);
-}
+const STATUS_STYLES: Record<QueryStatus, string> = {
+  pending: styles.statusPending,
+  running: styles.statusRunning,
+  completed: styles.statusCompleted,
+  failed: styles.statusFailed,
+  stopped: styles.statusStopped,
+};
 
 function numFlds(
-  rows: Record<string, unknown>[],
-  selected: string[],
-  joinFlds?: string[],
+  data: Record<string, unknown>[],
+  fields: string[],
+  joinFields?: string[],
 ): string[] {
-  if (rows.length === 0) return [];
-  const allNum = Object.entries(rows[0])
-    .filter(([k, v]) => typeof v === 'number' && !META.has(k))
+  if (data.length == 0) return [];
+
+  const numeric = Object.entries(data[0])
+    .filter(([k, v]) => (typeof v === 'number') && !META.has(k))
     .map(([k]) => k);
-  const combined = [...selected, ...(joinFlds ?? [])];
-  if (combined.length > 0) {
-    const set = new Set(combined);
-    return allNum.filter((f) => set.has(f));
+
+  const combined = [...fields, ...(joinFields ?? [])];
+  if(combined.length > 0){
+    const allowed = new Set(combined);
+    return numeric.filter((s) => allowed.has(s));
   }
-  return allNum;
+  return numeric;
 }
 
+/**
+ * Extracts epoch-ms timestamp from a telemetry row.
+ *
+ */
 function getTs(row: Record<string, unknown>): number | null {
-  for (const k of ['timestamp', 'start', 'end']) {
-    const v = row[k];
-    if (typeof v === 'number') return v;
-  }
-  return null;
+    for (const key of ['timestamp', 'start', 'end']) {
+        const v = row[key];
+        if (typeof v === 'number') {
+            return v < 1e12 ? v * 1000 : v;
+        }
+    }
+    return null;
 }
+
 
 function aggByTs(
-  rows: Record<string, unknown>[],
+  data: Record<string, unknown>[],
   fields: string[],
 ): Map<number, Record<string, number>> {
-  const buckets = new Map<number, { sums: Record<string, number>; counts: Record<string, number> }>();
+  const buckets = new Map<number, { somas: Record<string, number>; contagens: Record<string, number> }>();
 
-  for (const row of rows) {
+  for (const row of data) {
     const ts = getTs(row);
     if (ts == null) continue;
 
-    let b = buckets.get(ts);
-    if (!b) {
-      b = { sums: {}, counts: {} };
-      buckets.set(ts, b);
+    let bucket = buckets.get(ts);
+    if (!bucket) {
+      bucket = { somas: {}, contagens: {} };
+      buckets.set(ts, bucket);
     }
     for (const f of fields) {
-      const v = row[f];
-      if (typeof v === 'number') {
-        b.sums[f] = (b.sums[f] ?? 0) + v;
-        b.counts[f] = (b.counts[f] ?? 0) + 1;
+      var val = row[f];
+      if (typeof val === 'number') {
+        bucket.somas[f] = (bucket.somas[f] ?? 0) + val;
+        bucket.contagens[f] = (bucket.contagens[f] ?? 0) + 1;
       }
     }
   }
 
-  const out = new Map<number, Record<string, number>>();
-  for (const [ts, { sums, counts }] of buckets) {
+  const result = new Map<number, Record<string, number>>();
+  for (const [ts, { somas, contagens }] of buckets) {
     const avg: Record<string, number> = {};
     for (const f of fields) {
-      avg[f] = counts[f] ? sums[f] / counts[f] : 0;
+      avg[f] = contagens[f] ? somas[f] / contagens[f] : 0;
     }
-    out.set(ts, avg);
+    result.set(ts, avg);
   }
-  return out;
+  return result;
 }
 
-function detectGws(rows: Record<string, unknown>[]): string[] | null {
-  const gws = new Set<string>();
-  for (const row of rows) {
-    const gw = row['GATEWAY_ID'];
-    if (typeof gw === 'string' || typeof gw === 'number') gws.add(String(gw));
+function detectGws(data: Record<string, unknown>[]): string[] | null {
+  var ids = new Set<string>();
+  var i = 0, len = data.length;
+  while (i < len) {
+      var gw = data[i]['GATEWAY_ID'];
+      if (gw !== undefined && gw !== null) ids.add('' + gw);
+      i++;
   }
-  return gws.size > 1 ? [...gws].sort() : null;
+  if (ids.size < 2) return null;
+  var out = Array.from(ids);
+  out.sort();
+  return out;
 }
 
 const tooltipCfg = {
@@ -112,6 +130,7 @@ const tooltipCfg = {
   textStyle: { color: '#1a1a1a', fontSize: 12 },
 };
 const gridCfg = { top: 36, right: 16, bottom: 32, left: 56 };
+
 const xAxisCfg = {
   type: 'time' as const,
   axisLine: { lineStyle: { color: 'rgba(0,0,0,0.08)' } },
@@ -128,102 +147,107 @@ const yAxisCfg = {
 };
 
 function buildChartOpt(
-  rows: Record<string, unknown>[],
-  fields: string[],
-  isUnion?: boolean,
+  data: Record<string, unknown>[],
+  numericFields: string[],
+  hasUnion?: boolean,
 ): ECOption {
-  const gws = isUnion ? detectGws(rows) : null;
+  let gateways: string[] | null = null;
+  if (hasUnion) gateways = detectGws(data);
 
-  if (gws) {
+  // console.log('[chart] %d rows, fields=%o, union=%s', data.length, numericFields, hasUnion);
+
+  if (gateways) {
     type Spec = { type: 'line'; name: string; data: [number, number | null][]; smooth: boolean; showSymbol: boolean; lineStyle: { width: number; color: string }; itemStyle: { color: string } };
-    const allSeries: Spec[] = [];
-    const legend: string[] = [];
-    let ci = 0;
+    var series: Spec[] = [];
+    var legendNames: string[] = [];
+    var colIdx = 0;
 
-    for (const field of fields) {
-      for (const gw of gws) {
-        const gwRows = rows.filter((r) => String(r['GATEWAY_ID']) === gw);
-        const agg = aggByTs(gwRows, [field]);
-        const sorted = [...agg.keys()].sort((a, b) => a - b);
-        const nm = `${field} (${gw})`;
-        const clr = COLOURS[ci % COLOURS.length];
-        ci++;
+    for (const field of numericFields) {
+      for (var g = 0; g < gateways.length; g++) {
+        var gwId = gateways[g];
+        var subset = data.filter((r) => String(r['GATEWAY_ID']) === gwId);
+        var agg = aggByTs(subset, [field]);
+        var timestamps = [...agg.keys()].sort((a, b) => a - b);
+        var seriesName = field + ' (' + gwId + ')';
+        var colour = COLOURS[colIdx % COLOURS.length];
+        colIdx++;
+        legendNames.push(seriesName);
 
-        legend.push(nm);
-        allSeries.push({
-          type: 'line' as const,
-          name: nm,
-          data: sorted.map((ts) => [ts, agg.get(ts)?.[field] ?? null]),
-          smooth: false,
-          showSymbol: false,
-          lineStyle: { width: 2, color: clr },
-          itemStyle: { color: clr },
+        series.push({
+          type: 'line', name: seriesName,
+          data: timestamps.map((t) => [t, agg.get(t)?.[field] ?? null] as [number, number | null]),
+          smooth: false, showSymbol: false,
+          lineStyle: { width: 2, color: colour }, itemStyle: { color: colour },
         });
       }
     }
 
-    return {
-      tooltip: tooltipCfg,
-      legend: { data: legend, top: 4, textStyle: { color: 'rgba(30,30,30,0.64)', fontSize: 11 } },
-      grid: gridCfg,
-      xAxis: xAxisCfg,
-      yAxis: yAxisCfg,
-      dataZoom: [{ type: 'inside', start: 0, end: 100 }],
-      series: allSeries,
-    };
+    return { tooltip: tooltipCfg, legend: { data: legendNames, top: 4, textStyle: { color: 'rgba(30,30,30,0.64)', fontSize: 11 } }, grid: gridCfg, xAxis: xAxisCfg, yAxis: yAxisCfg, dataZoom: [{ type: 'inside', start: 0, end: 100 }], series };
   }
 
-  const agg = aggByTs(rows, fields);
-  const sortedTs = [...agg.keys()].sort((a, b) => a - b);
-
-  const series = fields.map((f, i) => ({
-    type: 'line' as const,
-    name: f,
-    data: sortedTs.map((ts) => [ts, agg.get(ts)?.[f] ?? null]),
-    smooth: false,
-    showSymbol: false,
-    lineStyle: { width: 2, color: COLOURS[i % COLOURS.length] },
-    itemStyle: { color: COLOURS[i % COLOURS.length] },
-  }));
+  const aggregated = aggByTs(data, numericFields);
+  const sortedTs = [...aggregated.keys()].sort((a, b) => a - b);
+  const series2 = numericFields.map((field, i) => {
+    const colour = COLOURS[i % COLOURS.length];
+    return {
+      type: 'line' as const,
+      name: field,
+      data: sortedTs.map((t) => [t, aggregated.get(t)?.[field] ?? null]),
+      smooth: false,
+      showSymbol: false,
+      lineStyle: { width: 2, color: colour },
+      itemStyle: { color: colour },
+    };
+  });
 
   return {
     tooltip: tooltipCfg,
-    legend: { data: fields, top: 4, textStyle: { color: 'rgba(30,30,30,0.64)', fontSize: 11 } },
+    legend: { data: numericFields, top: 4, textStyle: { color: 'rgba(30,30,30,0.64)', fontSize: 11 } },
     grid: gridCfg,
     xAxis: xAxisCfg,
     yAxis: yAxisCfg,
     dataZoom: [{ type: 'inside', start: 0, end: 100 }],
-    series,
+    series: series2,
   };
 }
 
-// nES results can arrive out of order during coordinator failover, the new
-export function QueryResultCard({ query, defaultExpanded, onRemove }: Props): React.JSX.Element {
+export function QueryResultCard({ query, defaultExpanded, onRemove, onRename }: Props): React.JSX.Element {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [intervalSec, setIntervalSec] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(query.request.name || '');
 
-  const sorted = useMemo(() => {
-    const rows = [...query.results];
-    rows.sort((a, b) => {
-      const ta = getTs(a);
-      const tb = getTs(b);
-      if (ta != null && tb != null) return ta - tb;
-      return 0;
+  const sorted = [...query.results].sort((a, b) => {
+    const ta = getTs(a), tb = getTs(b);
+    return (ta != null && tb != null) ? ta - tb : 0;
+  });
+
+  let filtered = sorted;
+  if (intervalSec !== 0) {
+    var cutoff = Date.now() - (intervalSec * 1000);
+    filtered = sorted.filter((row) => {
+      const t = getTs(row);
+      return t !== null && t > cutoff;
     });
-    return rows;
-  }, [query.results]);
+  }
 
-  const cols = getCols(sorted);
-  const chartFlds = useMemo(
-    () => numFlds(sorted, query.request.fields, query.request.joinFields),
-    [sorted, query.request.fields, query.request.joinFields],
+  var cols = filtered.length > 0 ? Object.keys(filtered[0]) : [];
+
+  const numeric = useMemo(
+    () => numFlds(filtered, query.request.fields, query.request.joinFields),
+    [filtered,query.request.fields, query.request.joinFields],
   );
-  const isUnion = (query.request.unionSources?.length ?? 0) > 0;
+
+  const hasUnion = !!(query.request.unionSources && query.request.unionSources.length);
+
   const chartOpt = useMemo(
-    () => buildChartOpt(sorted, chartFlds, isUnion),
-    [sorted, chartFlds, isUnion],
+    () => buildChartOpt(filtered, numeric, hasUnion),
+    [filtered, numeric, hasUnion],
   );
 
-  const hasChart = chartFlds.length > 0 && sorted.length > 0;
+  const hasChart = numeric.length > 0 && filtered.length > 0;
+  const showTable = (query.status === 'completed' || query.status === 'stopped') && filtered.length > 0;
+  const lastRows = filtered.slice(-20); // paginated table is on the roadmap 
 
   return (
     <div className={styles.card}>
@@ -231,24 +255,43 @@ export function QueryResultCard({ query, defaultExpanded, onRemove }: Props): Re
         className={styles.header}
         role="button"
         tabIndex={0}
-        onClick={() => setExpanded((p) => !p)}
+        onClick={() => setExpanded((v) => !v)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            setExpanded((p) => !p);
+            setExpanded((v) => !v);
           }
         }}
       >
-        {/* first 8 chars of the UUID - enough to identify in the coordinator logs */}
-        <span className={styles.queryId}>{query.id.slice(0, 8)}</span>
+        {editing ? (
+          <input
+            className={styles.queryId}
+            autoFocus
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={() => { setEditing(false); onRename?.(query.id, editName); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setEditing(false); onRename?.(query.id, editName); } if (e.key === 'Escape') setEditing(false); }}
+            onClick={(e) => e.stopPropagation()}
+            style={{ border: '1px solid #ccc', borderRadius: 4, padding: '2px 6px', fontSize: 'inherit', width: 180 }}
+          />
+        ) : (
+          <span
+            className={styles.queryId}
+            title="Click to rename"
+            onClick={(e) => { e.stopPropagation(); setEditing(true); setEditName(query.request.name || ''); }}
+            style={{ cursor: 'text' }}
+          >
+            {query.request.name || query.id.slice(0, 8)}
+          </span>
+        )}
 
         <span className={styles.headerRight}>
-          {sorted.length > 0 && (
+          {filtered.length > 0 && (
             <span className={styles.rowCount}>
-              {sorted.length} row{sorted.length !== 1 ? 's' : ''}
+              {filtered.length} row{filtered.length !== 1 ? 's' : ''}
             </span>
           )}
-          <span className={badgeCls(query.status)}>{query.status}</span>
+          <span className={`${styles.badge} ${STATUS_STYLES[query.status]}`}>{query.status}</span>
           <button
             type="button"
             className={styles.deleteBtn}
@@ -271,59 +314,53 @@ export function QueryResultCard({ query, defaultExpanded, onRemove }: Props): Re
         <div className={styles.body}>
           {hasChart && (
             <div className={styles.chartWrapper}>
+              <div className={styles.intervalBar}>
+                {TIME_INTERVALS.map(({ label, seconds }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className={`${styles.intervalBtn} ${intervalSec === seconds ? styles.intervalActive : ''}`}
+                    onClick={() => setIntervalSec(seconds)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <EChart option={chartOpt} style={{ height: '240px' }} />
             </div>
           )}
 
-          {/* show the raw table only after the query finishes - displaying
-              partial results mid-stream caused layout thrashing */}
-          {(query.status === 'completed' || query.status === 'stopped') && sorted.length > 0 && (
-            <div className={styles.tableWrapper}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    {cols.map((c) => (
-                      <th key={c} className={styles.th}>{c}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.slice(-20).map((row, idx) => (
-                    <tr key={idx} className={styles.tr}>
-                      {cols.map((c) => (
-                        <td key={c} className={styles.td}>
-                          {String(row[c] ?? '')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {showTable && <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead><tr>{cols.map(c =>
+                <th key={c} className={styles.th}>{c}</th>
+              )}</tr></thead>
+              <tbody>{lastRows.map((row, i) =>
+                <tr key={i} className={styles.tr}>{cols.map(c =>
+                  <td key={c} className={styles.td}>{row[c] != null ? String(row[c]) : ''}</td>
+                )}</tr>
+              )}</tbody>
+            </table>
+          </div>}
 
-          {query.status === 'running' && sorted.length === 0 && (
+          {query.status === 'running' && filtered.length == 0 && (
             <div className={styles.waiting}>
               Waiting for first data point...
             </div>
           )}
 
-          {/* error display is intentionally sparse - the coordinator often
-              returns cryptic C++ error messages that aren't useful to the
-              end user.  TODO: parse known error patterns and show friendlier text */}
           {query.status === 'failed' && (
             <div className={styles.error}>
               {query.error ?? 'Unknown error'}
             </div>
           )}
-
           {query.status === 'pending' && (
             <div className={styles.waiting}>
               Waiting for results...
             </div>
           )}
 
-          {query.status === 'stopped' && sorted.length === 0 && (
+          {query.status === 'stopped' && !filtered.length && (
             <div className={styles.waiting}>
               Query was stopped.
             </div>

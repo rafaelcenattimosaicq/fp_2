@@ -29,8 +29,7 @@ pub fn render(ui: &mut egui::Ui, state: &SharedState) {
         return;
     }
 
-    // column headers, deliberately not in a Grid because the hex column
-    // is variable width and Grid would either clip or waste space
+
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new("Time").small().strong().color(egui::Color32::GRAY));
         ui.add_space(20.0);
@@ -64,9 +63,7 @@ pub fn render(ui: &mut egui::Ui, state: &SharedState) {
 
                 ui.label(egui::RichText::new("|").monospace().color(pipe));
 
-                // printable ASCII alongside the hex dump, helps spot
-                // modbus exception responses visually (they start with
-                // the slave ID followed by FC|0x80)
+                // printable ASCII
                 let ascii: String = entry.bytes.iter()
                     .map(|&b| if b.is_ascii_graphic() || b == b' ' { char::from(b) } else { '.' })
                     .collect();

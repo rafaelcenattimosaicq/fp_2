@@ -48,6 +48,10 @@ export interface AlertRule {
   operator: string;
   threshold: string;
   active: boolean;
+  /** Auto-action: write a register when the rule triggers */
+  actionRegisterId?: string;
+  actionValue?: number;
+  actionGatewayId?: string;
 }
 
 export type FeedItem = {

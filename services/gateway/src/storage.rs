@@ -4,16 +4,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-// 90 days. Customers with seasonal HVAC cycles
-// want to compare "same week last year". 90 is a compromise because
-// the Pi's SD card is only 16GB and the DB can hit ~800MB on a gateway
-// with 40+ registers polled at 1s intervals.
+// 90 days
 const RETENTION_SECS: i64 = 90 * 24 * 3600;
 
-// floor for how many rows we'll accumulate before the next prune.
-// without this the DELETE on open can take 10+ seconds on a Pi Zero
-// after a long uptime, and the UI just shows a spinner. We now prune
-// incrementally via prune_if_needed() instead.
+
 const PRUNE_BATCH: i64 = 50_000;
 
 #[derive(Debug, Clone)]
@@ -32,12 +26,9 @@ impl HistoryDb {
 
         let conn = Connection::open(&path)?;
 
-        // wAL is non-negotiable: the UI polls query_range() every 2s while
-        // insert_poll() is still running from the Modbus loop. Without WAL the
-        // uI thread blocks on the writer and the chart stutters visibly.
+
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
-        // 3000ms busy timeout, saw deadlocks on the CM4 with the default.
-        // could probably be lower now that we batch inserts but haven't tested.
+
         conn.execute_batch("PRAGMA busy_timeout=3000;")?;
 
         conn.execute_batch(
@@ -52,9 +43,6 @@ impl HistoryDb {
             CREATE INDEX IF NOT EXISTS idx_rh_reg_ts
                 ON register_history(register_id, timestamp_ms);",
         )?;
-
-        // do one big prune on startup to catch up if we've been offline a while,
-        // but only if the table already exists (first run = nothing to prune)
         let cutoff_ms = now_ms() - RETENTION_SECS * 1000;
         let pruned = conn.execute(
             "DELETE FROM register_history WHERE timestamp_ms < ?1",
@@ -99,9 +87,6 @@ impl HistoryDb {
                     "INSERT INTO register_history (timestamp_ms, register_id, value) VALUES (?1, ?2, ?3)",
                     params![ts, register_id, v],
                 ) {
-                    // this fires when the SD card is full on field units, worth
-                    // logging so the tech doesn't stare at an empty chart for 20 min
-                    // wondering why there's no data. Ask me how I know.
                     tracing::warn!(register = %register_id, error = %e, "history insert failed");
                 }
                 inserted += 1;
@@ -121,9 +106,6 @@ impl HistoryDb {
     fn prune_old_rows(&self) {
         let Ok(conn) = self.conn.lock() else { return };
         let cutoff = now_ms() - RETENTION_SECS * 1000;
-
-        // dELETE with LIMIT isn't standard SQLite, so we use a subquery.
-        // this keeps the prune under ~50ms even on slow SD cards.
         match conn.execute(
             "DELETE FROM register_history WHERE id IN (
                 SELECT id FROM register_history WHERE timestamp_ms < ?1 LIMIT 10000
@@ -161,9 +143,6 @@ impl HistoryDb {
             })
             .map_or_else(|_| Vec::new(), |rows| rows.filter_map(Result::ok).collect())
         } else {
-            // can't use a static prepared statement here because the number of
-            // register_ids varies. The placeholders are positional (?3, ?4, ...)
-            // which is ugly but avoids any SQL injection since they're all bound.
             let placeholders: Vec<String> = register_ids
                 .iter()
                 .enumerate()
@@ -309,10 +288,6 @@ mod tests {
         let regs = db.available_registers();
         assert_eq!(regs, vec!["rpm", "temp"]);
     }
-
-    // regression: we had a bug where query_range with an empty register_ids
-    // slice would return nothing because the IN clause was empty. Now it
-    // takes a different code path (no IN clause at all).
     #[test]
     fn query_range_empty_filter_returns_all() {
         let (_tmp, db) = tmp_db();

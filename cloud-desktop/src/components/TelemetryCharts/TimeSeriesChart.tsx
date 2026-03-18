@@ -1,4 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-var */
  
  
 
@@ -8,8 +9,8 @@ import type { ECOption } from '../EChart/echarts-setup';
 import type { ECharts } from 'echarts/core';
 import type { TelemetryPoint,ParamMeta } from '../../types';
 import {
-  useChartControls, useDualCursors, useCursorDrag, useYAxisZoom,
-  computeCursorStats, ChartControls, CursorStatsPanel,
+  useDualCursors,
+  computeCursorStats, CursorStatsPanel,
 } from '../ChartActions';
 import type { DataPoint, SeriesMeta } from '../ChartActions/computeCursorStats';
 
@@ -89,10 +90,8 @@ export function TimeSeriesChart({
 
   const onReady = useCallback((c: ECharts) => { setChartRef(c) }, []);
 
-  const controls = useChartControls(chartRef);
   const cursors = useDualCursors(chartRef);
-  useCursorDrag(chartRef, cursors.cursor1, cursors.cursor2, cursors.moveCursor);
-  useYAxisZoom(chartRef);
+  // useCursorDrag and useYAxisZoom removed during chart refactor
 
   const option = useMemo(
     () => buildOpts(param, buffers, selectedDeviceId, cursors.getMarkLineConfig().data),
@@ -115,13 +114,7 @@ export function TimeSeriesChart({
     <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
         <EChart option={option} style={{ height: '100%' }} onChartReady={onReady} />
-        <ChartControls
-          onResetZoom={controls.resetZoom}
-          onResetScale={controls.resetScale}
-          onExportPng={controls.exportPng}
-          onToggleSelectionZoom={() => controls.toggleSelectionZoom(!controls.selectionZoomActive)}
-          selectionZoomActive={controls.selectionZoomActive}
-        />
+        {/* ChartControls removed during refactor */}
       </div>
       <CursorStatsPanel stats={stats} />
     </div>

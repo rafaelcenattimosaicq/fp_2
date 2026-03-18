@@ -1,11 +1,14 @@
+/* eslint-disable no-var */
+
+
+
+
 import type { TelemetryPoint } from '../types';
 
-// takes raw json string from mqtt and turns it into our TelemetryPoint format
 export function parseTelemetry(json: string): TelemetryPoint | null {
   try {
     const data = JSON.parse(json) as Record<string, unknown>;
 
-    // get device id from either field (backend sends DEVICE_ID, some devices send device_id)
     let deviceId: string;
     if (data.DEVICE_ID != undefined) {
       deviceId = String(data.DEVICE_ID);

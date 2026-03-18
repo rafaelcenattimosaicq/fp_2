@@ -1,9 +1,50 @@
-
+/* eslint-disable prefer-const */
+/* eslint-disable no-var */
+var TEXT_TYPE_PREFIXES = ['TEXT', 'Char'];
+var FUNCOES_QUEBRADAS = ['COUNT'];
+// NES v0.6.x coordinator query builder
 import { useCallback, useMemo } from 'react';
 import type { QueryRequest } from '../types';
 import { nesOperator, nesValue } from '../utils/nesHelpers';
 
 const API_BASE = import.meta.env.VITE_NES_API_URL ?? 'http://localhost:8081';
+
+// validate query against known NES bugs 
+export function validateQuery(
+  request: QueryRequest,
+  fieldTypes: Record<string, string>,
+): ValidationResult {
+  let errors: string[] = [];
+  let warnings: string[] = [];
+
+  for (var filter of request.filters) {
+    let fType = fieldTypes[filter.field] ?? '';
+    if (TEXT_TYPE_PREFIXES.some((p) => fType.startsWith(p))) {
+      errors.push(`Cannot filter on TEXT field "${filter.field}" - NES crashes on text comparisons.`);
+    }
+  }
+
+  // COUNT is broken 
+  for (const agg of request.aggregations) {
+    if (FUNCOES_QUEBRADAS.includes(agg.function)) {
+      errors.push('COUNT aggregation returns incorrect results in NES. Use SUM or AVG instead.');
+    }
+  }
+
+  // TODO: revisit MIN/MAX after upgrading NES
+  for (var agg of request.aggregations) {
+    if (agg.function === 'MIN' || agg.function === 'MAX') {
+      warnings.push(`${agg.function} aggregation has known edge-case issues in NES.`);
+    }
+  }
+
+  // JOIN without window = instant crash on the coordinator
+  if (request.joinSource && !request.window) {
+    errors.push('JOIN queries require a window. Select a tumbling or sliding window.');
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
 
 export interface LogicalSource {
   name: string;
@@ -17,127 +58,18 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-const TEXT_TYPE_PREFIXES = ['TEXT', 'Char'];
-
-// validate query before sending to NES so it doesnt just crash silently
-export function validateQuery(
-  request: QueryRequest,
-  fieldTypes: Record<string, string>,
-): ValidationResult {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
-  for (const filter of request.filters) {
-    const fType = fieldTypes[filter.field] ?? '';
-    if (TEXT_TYPE_PREFIXES.some((p) => fType.startsWith(p))) {
-      errors.push(`Cannot filter on TEXT field "${filter.field}" - NES crashes on text comparisons.`);
-    }
-  }
-
-  for (const agg of request.aggregations) {
-    if (agg.function === 'COUNT') {
-      errors.push('COUNT aggregation returns incorrect results in NES. Use SUM or AVG instead.');
-    }
-  }
-
-  // mIN/MAX work in most cases but have known edge-case bugs
-  for (const agg of request.aggregations) {
-    if (agg.function === 'MIN' || agg.function === 'MAX') {
-      warnings.push(`${agg.function} aggregation has known edge-case issues in NES.`);
-    }
-  }
-
-  if (request.joinSource && !request.window) {
-    errors.push('JOIN queries require a window. Select a tumbling or sliding window.');
-  }
-
-  return { valid: errors.length === 0, errors, warnings };
-}
-
-function nesAggFunction(fn: string): string {
-  return fn.charAt(0).toUpperCase() + fn.slice(1).toLowerCase();
-}
-
-function buildWindowClause(w: import('../types').QueryWindow): string {
-  if (w.type === 'tumbling') {
-    return `.window(TumblingWindow::of(EventTime(Attribute("timestamp")), Seconds(${w.size})))`;
-  }
-  const slide = w.slide ?? Math.floor(w.size / 2);
-  return `.window(SlidingWindow::of(EventTime(Attribute("timestamp")), Seconds(${w.size}), Seconds(${slide})))`;
-}
-
-// turns QueryRequest into NES DSL string
-// resultTopicId goes in the mqtt topic so frontend subscribes to the right thing
-export function buildQueryDsl(request: QueryRequest, resultTopicId: string): string {
-  let dsl = `Query::from("${request.source}")`;
-
-  for (const filter of request.filters) {
-    if (!filter.field || filter.value === '') continue;
-    const op = nesOperator(filter.operator);
-    const val = nesValue(filter.value);
-    dsl += `.filter(Attribute("${filter.field}") ${op} ${val})`;
-  }
-
-  if (request.unionSources && request.unionSources.length > 0) {
-    for (const unionSrc of request.unionSources) {
-      dsl += `.unionWith(Query::from("${unionSrc}"))`;
-    }
-  }
-
-  if (!request.joinSource) {
-    for (const field of request.fields) {
-      dsl += `.map(Attribute("${field}") = Attribute("${field}"))`;
-    }
-  }
-
-  if (request.joinSource && request.joinKey) {
-    dsl += `.joinWith(Query::from("${request.joinSource}"))`;
-    dsl += `.where(Attribute("${request.source}$${request.joinKey.left}") == Attribute("${request.joinSource}$${request.joinKey.right}"))`;
-
-    if (request.window) {
-      dsl += buildWindowClause(request.window);
-    }
-
-    if (request.aggregations.length > 0) {
-      const aggParts = request.aggregations.map(
-        (agg) => `${nesAggFunction(agg.function)}(Attribute("${agg.field}"))`,
-      );
-      dsl += `.apply(${aggParts.join(', ')})`;
-    }
-  } else if (request.window && request.aggregations.length > 0) {
-    dsl += buildWindowClause(request.window);
-    const aggParts = request.aggregations.map(
-      (agg) => `${nesAggFunction(agg.function)}(Attribute("${agg.field}"))`,
-    );
-    dsl += `.apply(${aggParts.join(', ')})`;
-  }
-
-  // sink to mqtt if broker configured, otherwise print
-  const brokerUrl = import.meta.env.VITE_NES_MQTT_SINK_URL;
-  if (brokerUrl) {
-    const topic = `nebulastream/results/${resultTopicId}`;
-    dsl += `.sink(MQTTSinkDescriptor::create("${brokerUrl}", "${topic}", "", 1000, MQTTSinkDescriptor::TimeUnits::milliseconds, 1));`;
-  } else {
-    dsl += '.sink(PrintSinkDescriptor::create());';
-  }
-
-  return dsl;
-}
-
-// hook for NES query lifecycle (submit, stop, fetch sources)
 export function useQueryService() {
-  // submit query and get back result topic + coordinator id
   const submitQuery = useCallback(
     async (
       request: QueryRequest,
     ): Promise<{ resultId: string; coordinatorQueryId: number }> => {
-      const resultId = crypto.randomUUID();
-      const userQuery = buildQueryDsl(request, resultId);
+      var resultId = crypto.randomUUID();
+      let userQuery = buildQueryDsl(request, resultId);
 
-      // joins and unions need TopDown placement
-      const needsTopDown =
+      // FIXME: TopDown placement is required for joins and unions
+      let needsTopDown =
         !!request.joinSource || (request.unionSources && request.unionSources.length > 0);
-      const placement = needsTopDown ? 'TopDown' : 'BottomUp';
+      var placement = needsTopDown ? 'TopDown' : 'BottomUp';
 
       const res = await fetch(`${API_BASE}/v1/nes/query/execute-query`, {
         method: 'POST',
@@ -165,26 +97,24 @@ export function useQueryService() {
     [],
   );
 
-  // NES returns a weird format: array of single-entry objects like
-  // [{"source_name": "field1:INT32 field2:TEXT ..."}]
-  // so we have to parse that into something usable
+  // NES sourceCatalog returns a weird format
   const fetchSources = useCallback(async (): Promise<LogicalSource[]> => {
-    const res = await fetch(`${API_BASE}/v1/nes/sourceCatalog/allLogicalSource`);
+    var res = await fetch(`${API_BASE}/v1/nes/sourceCatalog/allLogicalSource`);
     if (!res.ok) throw new Error(res.statusText);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = (await res.json()) as any[];
+    let raw = (await res.json()) as any[];
     if (!Array.isArray(raw)) return [];
 
     return raw.map((entry) => {
       const [name, schemaStr] = Object.entries(entry)[0] ?? ['', ''];
 
-      const pairs = (schemaStr as string).split(/\s+/).filter((s) => s.includes(':'));
-      const fields = pairs.map((s) => s.split(':')[0]);
+      let pares = (schemaStr as string).split(/\s+/).filter((s) => s.includes(':'));
+      let fields = pares.map((s) => s.split(':')[0]);
 
-      const fieldTypes: Record<string, string> = {};
-      for (const pair of pairs) {
-        const [fieldName, fieldType] = pair.split(':');
+      var fieldTypes: Record<string, string> = {};
+      for (const pair of pares) {
+        let [fieldName, fieldType] = pair.split(':');
         if (fieldName && fieldType) {
           fieldTypes[fieldName] = fieldType;
         }
@@ -198,4 +128,76 @@ export function useQueryService() {
     () => ({ submitQuery, stopQuery, fetchSources }),
     [submitQuery, stopQuery, fetchSources],
   );
+}
+
+// builds the full NES DSL query string from a QueryRequest
+export function buildQueryDsl(request: QueryRequest, resultTopicId: string): string {
+  let dsl = `Query::from("${request.source}")`;
+
+  // apply filters
+  for (let filter of request.filters) {
+    if (!filter.field || filter.value === '') continue;
+    var op = nesOperator(filter.operator);
+    var val = nesValue(filter.value);
+    dsl += `.filter(Attribute("${filter.field}") ${op} ${val})`;
+  }
+
+  // UNION
+  if (request.unionSources && request.unionSources.length > 0) {
+    for (const unionSrc of request.unionSources) {
+      dsl += `.unionWith(Query::from("${unionSrc}"))`;
+    }
+  }
+
+  // map projection
+  if (!request.joinSource) {
+    for (var field of request.fields) {
+      dsl += `.map(Attribute("${field}") = Attribute("${field}"))`;
+    }
+  }
+
+  // JOIN
+  if (request.joinSource && request.joinKey) {
+    dsl += `.joinWith(Query::from("${request.joinSource}"))`;
+    dsl += `.where(Attribute("${request.source}$${request.joinKey.left}") == Attribute("${request.joinSource}$${request.joinKey.right}"))`;
+
+    if (request.window) {
+      if (request.window.type === 'tumbling') {
+        dsl += `.window(TumblingWindow::of(EventTime(Attribute("timestamp")), Seconds(${request.window.size})))`;
+      } else {
+        let tamanhoSlide = request.window.slide ?? Math.floor(request.window.size / 2);
+        dsl += `.window(SlidingWindow::of(EventTime(Attribute("timestamp")), Seconds(${request.window.size}), Seconds(${tamanhoSlide})))`;
+      }
+    }
+
+    if (request.aggregations.length > 0) {
+      let aggParts = request.aggregations.map(
+        (agg) => `${agg.function.charAt(0).toUpperCase() + agg.function.slice(1).toLowerCase()}(Attribute("${agg.field}"))`,
+      );
+      dsl += `.apply(${aggParts.join(', ')})`;
+    }
+  } else if (request.window && request.aggregations.length > 0) {
+    if (request.window.type === 'tumbling') {
+      dsl += `.window(TumblingWindow::of(EventTime(Attribute("timestamp")), Seconds(${request.window.size})))`;
+    } else {
+      let tamanhoSlide = request.window.slide ?? Math.floor(request.window.size / 2);
+      dsl += `.window(SlidingWindow::of(EventTime(Attribute("timestamp")), Seconds(${request.window.size}), Seconds(${tamanhoSlide})))`;
+    }
+    let aggParts = request.aggregations.map(
+      (agg) => `${agg.function.charAt(0).toUpperCase() + agg.function.slice(1).toLowerCase()}(Attribute("${agg.field}"))`,
+    );
+    dsl += `.apply(${aggParts.join(', ')})`;
+  }
+
+  // sink config
+  const brokerUrl = import.meta.env.VITE_NES_MQTT_SINK_URL;
+  if (brokerUrl) {
+    let topico = `nebulastream/results/${resultTopicId}`;
+    dsl += `.sink(MQTTSinkDescriptor::create("${brokerUrl}", "${topico}", "", 1000, MQTTSinkDescriptor::TimeUnits::milliseconds, 1));`;
+  } else {
+    console.warn('[NES] no MQTT broker configured, falling back to PrintSink');
+    dsl += '.sink(PrintSinkDescriptor::create());';
+  }
+
+  return dsl;
 }

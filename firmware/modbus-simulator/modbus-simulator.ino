@@ -1,6 +1,9 @@
 /**
  * ESP32 Modbus RTU Slave — Wind Turbine Motor Controller (0x0008)
  *
+ * Controls a DC motor via L9110S H-bridge driver, measures real RPM
+ * via KY-003 Hall effect sensor, and reports status over Modbus RTU.
+ *
  * Wiring:
  *   ESP32 D12 → L9110S A1 (forward PWM)
  *   ESP32 D11 → L9110S A2 (reverse PWM)
@@ -30,6 +33,7 @@
 
 #include <Arduino.h>
 
+// --- Motor pins (L9110S H-bridge) ---
 #define PIN_A1  13   // forward PWM
 #define PIN_A2  14   // reverse PWM
 #define PWM_FREQ 1000
@@ -122,6 +126,7 @@ void handleMotorCommand(uint16_t cmd) {
 static unsigned long lastUpdate = 0;
 
 void updateRegisters() {
+  // Ramp current speed toward target
   if (motorState == FORWARD || motorState == REVERSE) {
     if (currentSpeed < motorSpeed) {
       currentSpeed = min((int)currentSpeed + 5, (int)motorSpeed);
@@ -134,13 +139,16 @@ void updateRegisters() {
 
   applyMotor();
 
+  // Calculate real RPM from Hall sensor pulses every 500ms
   unsigned long now = millis();
   if (now - lastRpmCalcTime >= 500) {
     uint32_t currentCount = hallPulseCount;
     uint32_t pulses = currentCount - lastPulseCount;
     unsigned long elapsed = now - lastRpmCalcTime;
 
+    // CHANGE mode gives 2 edges per pass, so divide by 2
     uint32_t revolutions = pulses / 2;
+    // RPM = (revolutions / elapsed_ms) * 60000
     if (elapsed > 0 && revolutions > 0) {
       measuredRpm = (uint16_t)((revolutions * 60000UL) / elapsed);
     } else {
@@ -151,6 +159,7 @@ void updateRegisters() {
     lastRpmCalcTime = now;
   }
 
+  // Estimated current from PWM (~200mA at full speed)
   uint16_t currentMa = (uint16_t)((float)currentSpeed / 255.0 * 200.0);
 
   // Status registers
@@ -242,9 +251,11 @@ static int rxPos = 0;
 static unsigned long lastRx = 0;
 
 void setup() {
+  // Motor PWM
   ledcAttach(PIN_A1, PWM_FREQ, PWM_RES);
   ledcAttach(PIN_A2, PWM_FREQ, PWM_RES);
 
+  // Hall effect sensor — pull-up, interrupt on falling edge
   pinMode(PIN_HALL, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_HALL), hallISR, CHANGE);
 

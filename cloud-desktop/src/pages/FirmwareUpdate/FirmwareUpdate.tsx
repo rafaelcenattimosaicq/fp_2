@@ -1,3 +1,35 @@
+/* eslint-disable no-var */
+
+
+export var ESP32_OTA_PARTITION_MAX = 1536 * 1024;
+
+export const NES_FW_NAME_RE = /^nes-gw-\d+\.\d+\.\d+\.bin$/;
+
+var DEPLOYMENT_BADGE_MAP: Record<string, string> = {
+  success: 'badgeSuccess',
+  started: 'badgeProgress',
+  progress: 'badgeProgress',
+  failed: 'badgeFailed',
+};
+var DEPLOYMENT_LABELS: Record<string, string> = {
+  started: 'Started', progress: 'In Progress',
+  success: 'Success', failed: 'Failed',
+};
+
+function fmtSize(num: number): string {
+  if (num < 1024) return `${num} B`;
+  var kb = num / 1024;
+  return kb < 1024 ? `${kb.toFixed(1)} KB` : `${(kb / 1024).toFixed(1)} MB`;
+}
+
+var fmtDate = (str: string) => new Date(str).toLocaleDateString('en-US', {
+  month: 'short', day: 'numeric', year: 'numeric',
+});
+
+// badge class lookup 
+var badgeCls = (s: DeploymentStatus['status']) => styles[DEPLOYMENT_BADGE_MAP[s] ?? 'badgeProgress'];
+var statusLbl = (s: DeploymentStatus['status']) => DEPLOYMENT_LABELS[s] ?? s;
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from '../../components/Header/Header';
 import { FirmwareProvider, useFirmware } from '../../contexts/FirmwareContext';
@@ -6,37 +38,6 @@ import { useFirmwareService } from '../../hooks/useFirmwareService';
 import type { DeploymentStatus, DeviceRecord } from '../../types';
 import { getToken } from '../../utils/getToken';
 import styles from './FirmwareUpdate.module.css';
-
-function fmtSize(num: number): string {
-  if (num < 1024) return `${num} B`;
-  var kb = num / 1024;
-  if ((kb) < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
-}
-
-function fmtDate(str: string): string {
-  return new Date(str).toLocaleDateString('en-US', {
-    month: 'short' as const, day: 'numeric' as const, year: 'numeric' as const,
-  });
-}
-
-function badgeCls(s: DeploymentStatus['status']): string {
-  switch(s){
-    case 'success': return styles.badgeSuccess;
-    case 'started':
-    case 'progress': return styles.badgeProgress;
-    case 'failed': return styles.badgeFailed;
-  }
-}
-
-function statusLbl(s: DeploymentStatus['status']): string {
-  switch (s) {
-    case 'started': return 'Started';
-    case 'progress': return 'In Progress';
-    case 'success': return 'Success';
-    case 'failed': return 'Failed';
-  }
-}
 
 function FirmwareUpdateInner(): React.JSX.Element {
   const { firmware, status, error, loadFirmware, upload, remove } = useFirmware();

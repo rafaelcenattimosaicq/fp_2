@@ -24,9 +24,7 @@ pub fn check_status() -> TailscaleState {
         .map_or(TailscaleState::Stopped, TailscaleState::Connected)
 }
 
-// pull the 100.x.y.z CGNAT address out of `tailscale status --json`.
-// tailscale also assigns an fd7a:: v6 address but we only care about v4
-// because that's what the coordinator uses for worker registration.
+
 fn extract_v4_ip(raw: &str) -> Option<String> {
     let j: serde_json::Value = serde_json::from_str(raw).ok()?;
     j.get("Self")?
@@ -39,8 +37,7 @@ fn extract_v4_ip(raw: &str) -> Option<String> {
 }
 
 pub fn install() -> Result<(), TailscaleError> {
-    // linux: official one-liner from tailscale.com
-    // macos: homebrew cask (for local dev only, production is always linux)
+
     let out = if cfg!(target_os = "linux") {
         Command::new("sh")
             .args(["-c", "curl -fsSL https://tailscale.com/install.sh | sudo sh"])
@@ -67,9 +64,7 @@ pub fn connect(auth_key: &str, hostname: &str) -> Result<String, TailscaleError>
             &format!("--authkey={auth_key}"),
             &format!("--hostname={hostname}"),
             "--accept-routes",
-            // don't let tailscale touch /etc/resolv.conf.
-            // the Pi's local dnsmasq handles Cloud Map names (*.iot.local)
-            // and tailscale's MagicDNS would shadow them.
+    
             "--accept-dns=false",
             "--reset",
             "--timeout=30s",
@@ -82,10 +77,7 @@ pub fn connect(auth_key: &str, hostname: &str) -> Result<String, TailscaleError>
         return Err(TailscaleError::Connect(s.trim().to_string()));
     }
 
-    // sometimes `tailscale up` exits 0 before the backend has fully
-    // transitioned to Running. seen this on Pi 3B+ with slow SD cards.
-    // we just check and warn rather than failing because it usually
-    // sorts itself out within a second or two.
+
     if let Ok(tmp) = Command::new("tailscale").args(["status", "--json"]).output() {
         let raw = String::from_utf8_lossy(&tmp.stdout);
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
@@ -117,8 +109,7 @@ mod tests {
         assert_eq!(extract_v4_ip(blob), None);
     }
 
-    // discovered this when a containerised CI runner returned "{}" from
-    // tailscale status. the old code would panic on the unwrap chain.
+
     #[test]
     fn empty_json_is_none() {
         assert_eq!(extract_v4_ip("{}"), None);

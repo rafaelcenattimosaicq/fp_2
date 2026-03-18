@@ -159,8 +159,7 @@ pub fn render(
         ui.add_space(8.0);
 
         // ── mqtt ────────────────────────────────────────────────
-        // kept deliberately simple, there's nothing to configure,
-        // just show whether we're connected or not
+
         super::section_frame(ui).show(ui, |ui| {
             ui.set_min_width(ui.available_width());
             ui.strong("MQTT");
@@ -211,10 +210,7 @@ pub fn render(
                 ui.add_space(6.0);
                 let nc = match &nes_st {
                     NesStatus::Connected { .. } => super::STATUS_GREEN,
-                    NesStatus::Error(_) => super::STATUS_RED,
-                    // blue for "waiting", stands out from the amber "in progress" states
-                    // so operators can tell at a glance whether the worker is blocked on
-                    // the device connection or actively doing something
+
                     NesStatus::WaitingForDevice => egui::Color32::from_rgb(147, 197, 253),
                     NesStatus::Disabled => egui::Color32::GRAY,
                     _ => super::STATUS_AMBER,

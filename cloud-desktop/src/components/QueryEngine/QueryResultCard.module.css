@@ -86,6 +86,34 @@
   border-radius: var(--radius-sm);
   overflow: hidden;
 }
+.intervalBar {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 4px;
+}
+.intervalBtn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.intervalBtn:hover {
+  border-color: var(--xl-green);
+  color: var(--text-primary);
+}
+.intervalActive {
+  background: var(--xl-green);
+  color: #fff;
+  border-color: var(--xl-green);
+}
+.intervalActive:hover {
+  color: #fff;
+}
 .meta {
   font-size: var(--text-xs);
   color: var(--text-muted);

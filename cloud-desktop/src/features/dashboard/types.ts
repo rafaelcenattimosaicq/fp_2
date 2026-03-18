@@ -3,7 +3,7 @@ export type BlockType = 'telemetry' | 'nesTelemetry' | 'alerts' | 'queryEngine' 
 export const BLOCK_LABELS: Record<BlockType, string> = {
   telemetry: 'MQTT Telemetry',
   nesTelemetry: 'NES Telemetry',
-  alerts: 'Alerts & Commands',
+  alerts: 'Alerts',
   queryEngine: 'Query Engine',
   history: 'History Explorer',
 }

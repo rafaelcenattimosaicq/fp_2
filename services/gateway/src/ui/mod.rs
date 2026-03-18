@@ -52,23 +52,17 @@ impl GatewayApp {
 pub static THEME_APPLIED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-// 38px is the sweet spot for the 1024x600 display — still hittable
-// with fingers but doesn't eat half the screen. The Apple HIG says 44
-// but that's for phones where you hold it in one hand; on a desk-mounted
-// Pi screen 38 is fine.
+
 const TOUCH_MIN: f32 = 38.0;
 
 const PAD: f32 = 8.0;
-/// PAD_I8, used for egui Margin constructors that take i8.
 #[allow(clippy::cast_possible_truncation, reason = "PAD is a small constant (8.0) that fits in i8")]
 const PAD_I8: i8 = PAD as i8;
 const DOT_R: f32 = 5.0;
 
 impl eframe::App for GatewayApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // 250ms repaint, tested on Pi 4 (VideoCore VI). Going below 200ms
-        // causes visible frame drops when the chart tab has >10k points;
-        // going above 300ms makes the status dots feel unresponsive.
+ 
         ctx.request_repaint_after(std::time::Duration::from_millis(250));
         apply_theme(ctx);
 
@@ -134,7 +128,7 @@ impl eframe::App for GatewayApp {
     }
 }
 
-/// render a single tab button sized for touchscreen input.
+
 fn touch_tab(ui: &mut egui::Ui, current: &mut Tab, tab: Tab, label: &str) {
     let active = *current == tab;
     let (bg, fg) = if active {
@@ -147,8 +141,7 @@ fn touch_tab(ui: &mut egui::Ui, current: &mut Tab, tab: Tab, label: &str) {
         .fill(bg)
         .corner_radius(egui::CornerRadius::same(6))
         .stroke(egui::Stroke::NONE)
-        // 36px is the actual hit area; the panel's 44px height adds
-        // vertical padding so fingers still hit it reliably
+
         .min_size(egui::vec2(0.0, TOUCH_MIN - 8.0));
 
     if ui.add(btn).clicked() {
@@ -164,8 +157,7 @@ fn status_pill(ui: &mut egui::Ui, status: &crate::state::ConnectionStatus, prefi
         crate::state::ConnectionStatus::Error(_) => STATUS_RED,
     };
 
-    // painted circle instead of Unicode bullet, egui's built-in font
-    // doesn't include U+2022 and renders a tofu box on Pi framebuffer.
+
     let (rect, _) = ui.allocate_exact_size(
         egui::vec2(DOT_R * 2.0, DOT_R * 2.0),
         egui::Sense::hover(),

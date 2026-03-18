@@ -15,12 +15,6 @@ pub struct NesSchema {
     pub fields: Vec<NesField>,
 }
 
-// maps the client descriptor register types to NES Nautilus types.
-// "enum" and "bitwise" don't map to anything useful in NES, enums are strings
-// and bitwise is a bitmask. We skip them entirely in the schema.
-// "integer" maps to FLOAT64 (not INT64) because the client uses signed integers
-// for things like temperature that can go negative, and the Modbus registers
-// encode them as 16-bit signed values that we decode as f64 anyway.
 #[allow(clippy::match_same_arms)]
 fn map_reg_type(rt: Option<&str>) -> Option<&'static str> {
     match rt {
@@ -42,9 +36,6 @@ fn extract_device_type_id(desc: &DeviceDescriptor) -> String {
         )
 }
 
-// pull the register IDs from the graph_data section of SERVICE_DATA_ACQUISITION.
-// these are the registers that the the client desktop app shows in the real-time
-// chart, so they're the most important ones to include in the NES schema.
 fn graph_data_ids(desc: &DeviceDescriptor) -> Vec<String> {
     for svc in &desc.services {
         let is_da = svc.id.as_deref()
@@ -58,26 +49,17 @@ fn graph_data_ids(desc: &DeviceDescriptor) -> Vec<String> {
     Vec::new()
 }
 
-/// build a `NesSchema` from a device descriptor. Includes three fixed fields
-/// (`DEVICE_ID`, `GATEWAY_ID`, timestamp) plus up to `max_register_fields` register
-/// fields from the descriptor's characteristics.
-///
-/// register fields from `graph_data` are added first (priority), then remaining
-/// status registers fill up to the cap. Cap exists because the NES Nautilus
-/// mLIR compiler hangs with 100+ fields, 20 is a safe limit found by
-/// trial and error on the coordinator running on Fargate (2 vCPU / 4GB).
+/// build a `NesSchema` 
 pub fn build_schema(desc: &DeviceDescriptor, max_reg_fields: usize) -> NesSchema {
     let dev_id = extract_device_type_id(desc);
     let ls_name = format!("telemetry_{dev_id}");
 
-    // fixed fields always present
     let mut fields = vec![
         NesField { name: "DEVICE_ID".to_string(), nes_type: "UINT64".to_string() },
         NesField { name: "GATEWAY_ID".to_string(), nes_type: "UINT64".to_string() },
         NesField { name: "timestamp".to_string(), nes_type: "UINT64".to_string() },
     ];
 
-    // index status registers by ID for O(1) lookup
     let mut status_by_id: std::collections::HashMap<&str, &crate::device_descriptor::Register> =
         std::collections::HashMap::new();
     if let Some(chars) = &desc.characteristics {
@@ -89,7 +71,6 @@ pub fn build_schema(desc: &DeviceDescriptor, max_reg_fields: usize) -> NesSchema
     let mut seen: HashSet<String> = HashSet::new();
     let mut reg_count = 0;
 
-    // closure to try adding a register field, respecting the cap and dedup
     let mut try_add = |rid: &str| {
         if reg_count >= max_reg_fields { return; }
         if !seen.insert(rid.to_string()) { return; } // already added
@@ -101,11 +82,9 @@ pub fn build_schema(desc: &DeviceDescriptor, max_reg_fields: usize) -> NesSchema
         }
     };
 
-    // graph_data registers get priority, these are what the user sees in the chart
     let prio = graph_data_ids(desc);
     for id in &prio { try_add(id); }
 
-    // fill remaining slots with other status registers
     if let Some(chars) = &desc.characteristics {
         for reg in &chars.status { try_add(&reg.id); }
     }
@@ -113,9 +92,6 @@ pub fn build_schema(desc: &DeviceDescriptor, max_reg_fields: usize) -> NesSchema
     NesSchema { logical_source_name: ls_name, fields }
 }
 
-// maps our internal NES type names to the DSL syntax the coordinator expects.
-// nES uses a C++-style Schema::create()->addField(...) DSL for schema
-// registration via the REST API.
 #[allow(clippy::match_same_arms)]
 fn nes_type_to_dsl(t: &str) -> &'static str {
     match t {
@@ -127,8 +103,7 @@ fn nes_type_to_dsl(t: &str) -> &'static str {
     }
 }
 
-/// generate the Schema DSL string for the coordinator REST API.
-/// output looks like: `Schema::create()->addField(createField("foo", BasicType::UINT64))->...;`
+
 pub fn generate_schema_dsl(schema: &NesSchema) -> String {
     let mut dsl = String::from("Schema::create()");
     for f in &schema.fields {
@@ -171,16 +146,15 @@ mod tests {
         }
     }
 
-    // the client V0x0007 controller, verify we map all supported register types
-    // correctly and skip enum/bitwise
+  
     #[test]
     fn builds_schema_from() {
         let status = vec![
             mk_reg("STATUS_TEMP", "unsigned integer"),
             mk_reg("STATUS_PRESSURE", "integer"),
-            mk_reg("STATUS_MODE", "enum"),       // should be skipped
+            mk_reg("STATUS_MODE", "enum"),       
             mk_reg("STATUS_RUNNING", "boolean"),
-            mk_reg("STATUS_FLAGS", "bitwise"),    // should be skipped
+            mk_reg("STATUS_FLAGS", "bitwise"),
         ];
         let desc = mk_descriptor("0x0007", status);
         let schema = build_schema(&desc, usize::MAX);
@@ -201,13 +175,12 @@ mod tests {
         assert_eq!(schema.fields[5].nes_type, "UINT64");
     }
 
-    // same register ID appearing twice in the descriptor (happens with some
-    // older the client firmware that duplicates entries)
+
     #[test]
     fn deduplicates_register_ids() {
         let status = vec![
             mk_reg("STATUS_TEMP", "unsigned integer"),
-            mk_reg("STATUS_TEMP", "integer"),  // dupe, should be ignored
+            mk_reg("STATUS_TEMP", "integer"), 
         ];
         let schema = build_schema(&mk_descriptor("0x0007", status), usize::MAX);
         assert_eq!(schema.fields.len(), 4, "duplicate register should be skipped");
@@ -266,8 +239,7 @@ mod tests {
         assert!(!dsl.contains("STATUS_MODE")); // enum skipped
     }
 
-    // try building a schema from the real the client V0x0007 descriptor YAML
-    // if it's on disk. Skipped on CI where the file doesn't exist.
+
     #[test]
     fn schema_from_real_descriptor_if_available() {
         let path = std::path::Path::new("devices/V0x0007_1.03V2.yaml");
@@ -286,8 +258,7 @@ mod tests {
         for f in &schema.fields { println!("  {}: {}", f.name, f.nes_type); }
     }
 
-    // verify max_register_fields caps the schema. This matters because the NES
-    // nautilus MLIR compiler hangs with 100+ fields, we default to 20 in prod.
+
     #[test]
     fn max_register_fields_caps_schema_size() {
         let desc = DeviceDescriptor {
@@ -320,9 +291,6 @@ mod tests {
         assert_eq!(schema.fields.len(), 3, "only 3 fixed fields");
     }
 
-    // graph_data registers from SERVICE_DATA_ACQUISITION get priority over
-    // the general status register list. This way the chart-critical registers
-    // always make it into the schema even when we hit the field cap.
     #[test]
     fn prioritises_graph() {
         let status = vec![
@@ -393,6 +361,5 @@ mod tests {
         assert_eq!(schema.fields.len(), 5, "3 fixed + 2 register = 5");
         assert_eq!(schema.fields[3].name, "REG_C");
         assert_eq!(schema.fields[4].name, "REG_B");
-        // rEG_A didn't make it because cap=2
     }
 }

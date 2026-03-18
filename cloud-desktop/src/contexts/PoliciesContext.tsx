@@ -1,10 +1,25 @@
+/* eslint-disable prefer-const */
+/* eslint-disable no-var */
+// PoliciesContext 
+
+
 import {
-  createContext, useContext, useState, useCallback, useMemo,
+  createContext,useContext,useState,useCallback,useMemo,
 } from 'react';
 import type { ReactNode } from 'react';
 import { usePoliciesService } from '../hooks/usePoliciesService';
 import { getToken } from '../utils/getToken';
 import type { PolicySummary, Policy } from '../types';
+
+
+
+// reserved policy
+var RESERVED_NAMES = ['_default', '_system', '_diagnostics', 'internal'];
+
+
+var _snapshotAntesDeletar: PolicySummary[] = [];
+
+// --- exported types and React context ---
 
 export interface PoliciesContextValue {
   status: 'idle' | 'loading' | 'loaded' | 'error';
@@ -19,118 +34,173 @@ export interface PoliciesContextValue {
   clearSelection: () => void;
 }
 
-export const PoliciesContext = createContext<PoliciesContextValue | null>(null);
+var _CtxPolicies = createContext<PoliciesContextValue | null>(null);
+
 
 export function PoliciesProvider({ children }: { children: ReactNode }): React.JSX.Element {
-  const svc = usePoliciesService();
-  const [status, setStatus] = useState<PoliciesContextValue['status']>('idle');
-  const [policies, setPolicies] = useState<PolicySummary[]>([]);
-  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  var svc = usePoliciesService();
 
-  const loadPolicies = useCallback(async () => {
-    setStatus('loading');
-    setError(null);
+  const [status, setStatus] = useState<PoliciesContextValue['status']>('idle');
+  const [politicas, setPoliticas] = useState<PolicySummary[]>([]);
+  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  /*
+   * Fetch all policies from the gateway
+   */
+  const carregarPoliticas = useCallback(async () => {
+    setStatus('loading'); setErro(null);
     try {
-      const token = await getToken();
-      setPolicies(await svc.listPolicies(token));
+      var token = await getToken();
+      const lista = await svc.listPolicies(token);
+      setPoliticas(lista);
       setStatus('loaded');
     } catch(e) {
-      setError(e instanceof Error ? e.message : 'could not load policies');
+      const mensagem = e instanceof Error ? e.message : 'failed to fetch Modbus policies from gateway';
+      console.warn('[PoliciesCtx] carregarPoliticas failed:', mensagem);
+      setErro(mensagem);
       setStatus('error');
     }
   }, [svc]);
 
-  const selectPolicy = useCallback(async (name: string): Promise<Policy | null> => {
-    setError(null);
+
+
+  const abrirDetalhePolitica = useCallback(async (name: string): Promise<Policy | null> => {
+    setErro(null);
     try {
-      const token = await getToken();
-      const p = await svc.getPolicy(name, token);
-      setSelectedPolicy(p);
-      return(p);
+      var token = await getToken();
+      var p = await svc.getPolicy(name, token);
+      setSelectedPolicy(p); return(p);
     } catch(e) {
-      const msg = e instanceof Error ? e.message : 'load policy';
-      setError(msg);
+      var msg = e instanceof Error
+        ? e.message
+        : 'could not load policy YAML from NES gateway -- check if the policy name contains special chars';
+      console.warn('[PoliciesCtx] abrirDetalhePolitica:', msg);
+      setErro(msg);
       return null;
     }
   }, [svc]);
 
-  const createNewPolicy = useCallback(function() {
-    // default YAML template for new edge policies
+  var criarNovaPolitica = useCallback(function() {
     setSelectedPolicy({
       name: '',
-      content: '# new policy\nrules: []\n',
+      content: '#  NES policy\n# See gateway docs for YAML rule format\nrules: []\nschedule: "*/5 * * * *"\n',
       deviceIds: [],
       lastModified: new Date().toISOString(),
     });
   }, []);
 
-
-  const saveCurrentPolicy = useCallback(
+  // persist to gateway
+  const salvarPoliticaNoGateway = useCallback(
     async (name: string, content: string, deviceIds: string[]) => {
-      setError(null);
+      setErro(null);
+
+      // validate policy name 
+      if (!name || name.trim().length === 0) {
+        setErro('Policy name cannot be empty');
+        return;
+      }
+      if (name.length > 128) {
+        setErro('Policy name too long (max 128 characters)');
+        return;
+      }
+      if (RESERVED_NAMES.includes(name.toLowerCase())) {
+        setErro(`"${name}" is a reserved gateway config name — choose a different name`);
+        return;
+      }
+
+      // check for name 
+      let nameCollision = politicas.find(
+        p => p.name.toLowerCase() === name.toLowerCase() && p.name !== name
+      );
+      if (nameCollision) {
+        console.warn('[PoliciesCtx] name collision:', name, 'vs existing', nameCollision.name);
+        setErro(`A policy with a similar name already exists: "${nameCollision.name}". DynamoDB keys are case-sensitive — this would create a duplicate.`);
+        return;
+      }
+
+
+
+
       try {
-        const token = await getToken();
+        var token = await getToken();
         await svc.savePolicy(name, content, deviceIds, token);
-        // console.log('policy saved:', name, deviceIds.length, 'devices');
-        setPolicies(await svc.listPolicies(token));
-        setSelectedPolicy({ name, content, deviceIds, lastModified: new Date().toISOString() });
+
+        var listaAtualizada = await svc.listPolicies(token);
+        setPoliticas(listaAtualizada);
+
+        setSelectedPolicy({
+          name, content, deviceIds,
+          lastModified: new Date().toISOString(),
+        });
       } catch(e) {
-        setError(e instanceof Error ? e.message : 'could not save policy');
+        const errMsg = e instanceof Error ? e.message : 'could not persist policy to gateway';
+        if (errMsg.includes('ConditionalCheck')) {
+          setErro('Someone else modified this policy while you were editing. Reload and try again.');
+        } else {
+          console.warn('[PoliciesCtx] salvarPoliticaNoGateway falhou:', errMsg);
+          setErro(errMsg);
+        }
       }
     },
-    [svc],
+    [svc, politicas],
   );
 
-  // optimistic delete with rollback
-  const removePolicy = useCallback(
+
+
+  const excluirPolitica = useCallback(
     async (name: string) => {
-      setError(null);
-      const prevList = policies;
-      setPolicies(cur => cur.filter(p => p.name !== name));
+      setErro(null);
+      _snapshotAntesDeletar = politicas;
+
+      setPoliticas(cur => cur.filter(p => p.name !== name));
       setSelectedPolicy(cur => {
-        if (cur?.name === name) return null;
-        return cur;
+        if (cur?.name === name) return null; return cur;
       });
 
       try {
-        await svc.deletePolicy(name, await getToken());
+        var tk = await getToken();
+        await svc.deletePolicy(name, tk);
+        console.debug('[PoliciesCtx] policy deleted from DynamoDB:', name);
       } catch(e) {
-        // rollback on failure - this took a while to get right
-        setPolicies(prevList);
-        setError(e instanceof Error ? (e as Error).message : 'could not delete policy');
+        setPoliticas(_snapshotAntesDeletar);
+        var rollbackMsg = e instanceof Error ? (e as Error).message : 'gateway rejected policy deletion -- possible concurrent modification';
+        console.warn('[PoliciesCtx] rollback after delete failure:', rollbackMsg);
+        setErro(rollbackMsg);
       }
     },
-    [svc, policies],
+    [svc, politicas],
   );
-  const clearSelection = useCallback(() => { setSelectedPolicy(null) }, []);
 
-  const value = useMemo<PoliciesContextValue>(
+  var limparSelecao = useCallback(() => { setSelectedPolicy(null) }, []);
+
+  var ctxValue = useMemo<PoliciesContextValue>(
     () => ({
-      status,
-      policies,
+      status: status,
+      policies: politicas,
       selectedPolicy,
-      error,
-      loadPolicies,
-      selectPolicy,
-      createNewPolicy,
-      saveCurrentPolicy,
-      removePolicy,
-      clearSelection,
+      error: erro,
+      loadPolicies: carregarPoliticas,
+      selectPolicy: abrirDetalhePolitica,
+      createNewPolicy: criarNovaPolitica,
+      saveCurrentPolicy: salvarPoliticaNoGateway,
+      removePolicy: excluirPolitica,
+      clearSelection: limparSelecao,
     }),
-    [status, policies, selectedPolicy, error, loadPolicies, selectPolicy, createNewPolicy, saveCurrentPolicy, removePolicy, clearSelection],
+    [status,politicas,selectedPolicy,erro,carregarPoliticas,abrirDetalhePolitica,criarNovaPolitica,salvarPoliticaNoGateway,excluirPolitica,limparSelecao],
   );
 
   return (
-    <PoliciesContext.Provider value={value}>
+    <_CtxPolicies.Provider value={ctxValue}>
       {children}
-    </PoliciesContext.Provider>
+    </_CtxPolicies.Provider>
   );
 }
 
+
 // eslint-disable-next-line react-refresh/only-export-components
 export function usePolicies(): PoliciesContextValue {
-  const ctx = useContext(PoliciesContext);
-  if(!ctx) throw new Error('usePolicies requires a <PoliciesProvider> ancestor');
+  var ctx = useContext(_CtxPolicies);
+  if(!ctx) throw new Error('usePolicies requires a <PoliciesProvider> ancestor -- did you forget to wrap your route?');
   return ctx;
 }

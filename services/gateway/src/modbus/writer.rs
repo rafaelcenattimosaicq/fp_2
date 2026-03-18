@@ -27,7 +27,6 @@ pub fn prepare_writes(
 ) -> Vec<(u16, u16, String)> {
     let mut res = Vec::with_capacity(writes.len());
     for (id, v) in writes {
-        // linear scan is fine, param lists are 10-30 entries on joinville compressors
         let Some(r) = params.iter().find(|x| x.id == *id) else { continue };
         if let Some(a) = r.address {
             res.push((a, r.encode(*v), id.clone()));
@@ -36,9 +35,7 @@ pub fn prepare_writes(
     res
 }
 
-// FC06 write single register, one at a time.
-// joinville compressors need ~50ms delay between writes but
-// tokio-modbus already adds frame gaps so it works out
+// FC06 write 
 pub async fn execute_writes(
     ctx: &mut tokio_modbus::client::Context,
     writes: &[(u16, u16, String)],

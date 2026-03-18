@@ -44,7 +44,6 @@ pub async fn run_lifecycle(
 
     let mut pnid: Option<u32> = None;
 
-    // main loop - this took me forever to get right
     loop {
         let cu = wk_cfg.coordinator_rest_url.clone().unwrap_or_else(|| {
             let ip = resolve_to_ip(&vpn.coordinator_host);
@@ -251,7 +250,6 @@ async fn check_docker(img: &str, state: &SharedState) {
         }
     }
 
-    // check if image already pulled, docker pull is slow on RPi
     let img_exists = tokio::process::Command::new("docker")
         .args(["image", "inspect", img]).output().await
         .map(|o| o.status.success())

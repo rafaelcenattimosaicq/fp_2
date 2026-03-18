@@ -1,11 +1,15 @@
+/* eslint-disable prefer-const */
+/* eslint-disable no-var */
+// Tailscale VPN gateway management
 import { useMemo } from 'react';
 import type { VpnRequest, GatewayRegistration, RegisteredGateway } from '../types';
 import { authHeaders } from '../utils/getToken';
 
-// vpn approval api
-const API_BASE = (import.meta.env.VITE_VPN_API_URL as string | undefined) ?? '';
-// console.log('vpn api configured:', API_BASE.length > 0)
+
+var API_BASE = (import.meta.env.VITE_VPN_API_URL as string | undefined) ?? '';
 export const isVpnApiConfigured = API_BASE.length > 0;
+
+let TTL_DIAS_PENDENTE = 7;
 
 interface VpnApi {
   listRequests: (token: string) => Promise<VpnRequest[]>;
@@ -27,6 +31,7 @@ interface VpnApi {
 export function useVpnService(): VpnApi {
   return useMemo(() => ({
 
+    // list all pending VPN enrollment requests
     listRequests(token: string): Promise<VpnRequest[]> {
       return fetch(`${API_BASE}/vpn/requests`, {
         method: 'GET',
@@ -39,6 +44,7 @@ export function useVpnService(): VpnApi {
       .then((data) => data.requests);
     },
 
+    // approve a gateway
     async approveRequest(gatewayId: string, token: string): Promise<void> {
         var res = await fetch(`${API_BASE}/vpn/approve/${gatewayId}`, {
           method: 'POST',
@@ -46,11 +52,12 @@ export function useVpnService(): VpnApi {
         });
 
         if (res.ok == false) {
-          const body = await res.text();
+          let body = await res.text();
           throw new Error(`could not approve VPN request for "${gatewayId}": ${res.status} ${body}`);
         }
     },
 
+    // get gateway connection
     async getStatus(gatewayId: string, token: string): Promise<Record<string, unknown> | null> {
       try {
         var res = await fetch(`${API_BASE}/vpn/status/${gatewayId}`, {
@@ -63,6 +70,7 @@ export function useVpnService(): VpnApi {
       }
     },
 
+    // revoke Tailscale AC
     revokeAccess(gatewayId: string, token: string): Promise<void> {
       return fetch(`${API_BASE}/vpn/revoke/${gatewayId}`, {
         method: 'DELETE',
@@ -74,7 +82,7 @@ export function useVpnService(): VpnApi {
       });
     },
 
-    // register a new gateway in vpn
+    // register new gateway
     async registerGateway(data: GatewayRegistration, token: string): Promise<{ gateway_id: string; pre_shared_secret: string }> {
       var res = await fetch(`${API_BASE}/vpn/gateways`, {
         method: 'POST',
@@ -85,14 +93,16 @@ export function useVpnService(): VpnApi {
         let errText = '';
         try { errText = await res.text(); } catch { errText = ''; }
 
-        let msg = `HTTP ${res.status}`;
+        var msg = `HTTP ${res.status}`;
         if (errText.length > 0) msg = `HTTP ${res.status} - ${errText}`;
         throw new Error(msg);
       }
 
+      console.warn(`[VPN] registered gateway, TTL=${TTL_DIAS_PENDENTE}d for approval window`);
       return (await res.json()) as { gateway_id: string; pre_shared_secret: string };
     },
 
+    // list all registered
     listGateways(token: string): Promise<RegisteredGateway[]> {
         return fetch(`${API_BASE}/vpn/gateways`, {
           method: 'GET',
@@ -115,6 +125,7 @@ export function useVpnService(): VpnApi {
       }
     },
 
+    // get presigned S3 download URL
     async getDownloadUrl(arch: string, token: string): Promise<{ download_url: string; architecture: string }> {
       const res = await fetch(`${API_BASE}/vpn/download/${arch}`, {
           method: 'GET',

@@ -2,24 +2,14 @@ use crate::nes::coordinator_client;
 use crate::state::{LogLevel, SharedState, TrackedQuery};
 use std::time::Duration;
 
-// poll every 10s, same as the health check interval. Tried 5s initially but
-// it was too chatty in the logs and the coordinator REST API on Fargate
-// started returning 429s under load.
+
 const POLL_INTERVAL: Duration = Duration::from_secs(10);
 
-// queries stuck in OPTIMIZING for longer than this get auto-stopped.
-// 90s was chosen because the NES Nautilus MLIR compiler should finish
-// optimizing in <30s for schemas with <=20 fields. If it's still going
-// after 90s it's probably stuck (infinite loop in the optimizer, seen
-// this happen with schemas that have 100+ fields).
+
 const OPTIMIZING_TIMEOUT_SECS: u64 = 90;
 
-/// background task that watches the coordinator's query catalog for stuck
-/// or failed queries. Auto-stops queries stuck in OPTIMIZING state and
-/// logs state transitions for the desktop UI.
 pub async fn run_query_monitor(coord_url: String, state: SharedState) {
-    // wait 30s before starting, give the worker time to register and
-    // the first query to be submitted
+
     tokio::time::sleep(Duration::from_secs(30)).await;
 
     tracing::info!("Query monitor started");
@@ -32,7 +22,7 @@ pub async fn run_query_monitor(coord_url: String, state: SharedState) {
             Ok(q) => q,
             Err(e) => {
                 tracing::debug!(error = %e, "Query monitor: failed to fetch query catalog");
-                continue; // coordinator might be restarting, try again next tick
+                continue; // coordinator might be restarting, try again 
             }
         };
 
@@ -49,8 +39,6 @@ pub async fn run_query_monitor(coord_url: String, state: SharedState) {
             let first_seen = old.map_or(now, |o| o.first_seen_secs);
             let was_stopped = old.is_some_and(|o| o.auto_stopped);
 
-            // log state transitions so the user can see what's happening
-            // in the desktop UI without checking coordinator logs
             if let Some(o) = old {
                 if o.status != entry.status {
                     let msg = format!("Query monitor: query {} transitioned {} -> {}",
@@ -67,8 +55,7 @@ pub async fn run_query_monitor(coord_url: String, state: SharedState) {
 
             let mut auto_stopped = was_stopped;
 
-            // detect queries stuck in OPTIMIZING, the MLIR compiler sometimes
-            // enters an infinite loop with complex schemas
+            // detect queries stuck in OPTIMIZING
             let stuck = entry.status == "OPTIMIZING"
                 && old.is_none_or(|o| o.status == "OPTIMIZING" || o.status == "REGISTERED");
             if stuck && !was_stopped {

@@ -1,3 +1,32 @@
+/* eslint-disable no-var */
+
+export var EMBRACO_OTA_PARTITION_LIMIT = 1900 * 1024; // bytes, approximate
+
+function fmtSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  var kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+}
+
+// Dates displayed in the policy list and firmware catalogue
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+export const VALID_POLL_INTERVALS = [1, 2, 5, 10, 30, 60] as const;
+
+export function isValidPolicyYaml(raw: string): boolean {
+  try {
+    const doc = (typeof raw === 'string') ? raw.trim() : '';
+    return doc.length > 0 && doc.startsWith('version');
+  } catch {
+    return false;
+  }
+}
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Header } from '../components/Header/Header';
 import { PolicyList } from '../components/PolicyList/PolicyList';
@@ -17,19 +46,6 @@ import { getToken } from '../utils/getToken';
 import styles from './DevicePolicies.module.css';
 
 type DevicesTab = 'policies' | 'firmware' | 'configure';
-
-function fmtSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
-}
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
-}
 
 function PoliciesTab(): React.JSX.Element {
   const {

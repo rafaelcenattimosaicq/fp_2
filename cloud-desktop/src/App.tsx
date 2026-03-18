@@ -8,17 +8,15 @@ import { HistoryProvider } from './contexts/HistoryContext';
 import { Dashboard } from './pages/Dashboard';
 import DevicePolicies from './pages/DevicePolicies';
 import { Login } from './pages/Login';
-import { DemoDataProvider } from './demo/DemoDataProvider';
+// import { DemoDataProvider } from './demo/DemoDataProvider';
 import Gateways from './pages/Gateways';
 import Authorization from './pages/Authorization';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
-// wraps children with all the context providers needed for data
 function DataProviders({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <MqttProvider>
-      <DemoWrapper>
         <TelemetryProvider>
           <AlertsProvider>
             <QueryProvider>
@@ -28,17 +26,33 @@ function DataProviders({ children }: { children: React.ReactNode }): React.JSX.E
             </QueryProvider>
           </AlertsProvider>
         </TelemetryProvider>
-      </DemoWrapper>
     </MqttProvider>
   );
 }
+// function DataProviders({ children }: { children: React.ReactNode }): React.JSX.Element {
+//   return (
+//     <MqttProvider>
+//       <DemoWrapper>
+//         <TelemetryProvider>
+//           <AlertsProvider>
+//             <QueryProvider>
+//               <HistoryProvider>
+//                 {children}
+//               </HistoryProvider>
+//             </QueryProvider>
+//           </AlertsProvider>
+//         </TelemetryProvider>
+//       </DemoWrapper>
+//     </MqttProvider>
+//   );
+// }
 
-const DemoWrapper = ({children}: {children: React.ReactNode}): React.JSX.Element => {
-  if(!DEMO_MODE) {
-    return <>{children}</>
-  }
-  return <DemoDataProvider>{children}</DemoDataProvider>
-};
+// const DemoWrapper = ({children}: {children: React.ReactNode}): React.JSX.Element => {
+//   if(!DEMO_MODE) {
+//     return <>{children}</>
+//   }
+//   return <DemoDataProvider>{children}</DemoDataProvider>
+// };
 
 function ProtectedLayout(): React.JSX.Element {
   const { status } = useAuth();
@@ -62,7 +76,6 @@ function DemoLayout(): React.JSX.Element {
   return <DataProviders><Outlet /></DataProviders>
 }
 
-// TODO: add a 404 page at some point
 function App(): React.JSX.Element {
   if (DEMO_MODE) {
     return (

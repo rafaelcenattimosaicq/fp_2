@@ -19,8 +19,7 @@ struct LiveDevice {
     writable_params: Vec<Register>,
 }
 
-// TODO: filter serial ports by VID/PID so users don't connect to their mouse
-// (happened once at Joinville demo lol)
+
 fn enumerate_serial(st: &SharedState) {
     let data: Vec<(String, String)> = match serialport::available_ports() {
         Ok(found) => found.into_iter().map(|p| {
@@ -39,7 +38,6 @@ fn enumerate_serial(st: &SharedState) {
             (p.port_name, s)
         }).collect(),
         Err(_e) => {
-            // macOS: IOKit sandboxed, linux: usually /dev/ttyUSB* permissions
             Vec::new()
         }
     };
@@ -102,9 +100,6 @@ pub async fn run_poll_loop(
 ) {
     enumerate_serial(&state);
 
-    // 20 consecutive failures before we tear down.
-    // tuned at Joinville with 1s poll interval and the Waveshare adapter.
-    // below ~15 EMI from VFD causes false disconnects every couple hours
     const STREAK_LIMIT: u32 = 20;
 
     let mut ctx: Option<tokio_modbus::client::Context> = None;
@@ -149,8 +144,6 @@ pub async fn run_poll_loop(
                 if let Some(mb) = ctx.as_mut() {
                     crate::modbus::writer::read_parameters(mb, &d.writable_params, &state).await;
 
-                    // FIXME: probe_ota_support does 3 register reads, should be
-                    // combined with read_parameters to save round-trips
                     let ota_ok = crate::firmware::ota::probe_ota_support(mb).await;
                     let fw_ver = crate::firmware::ota::read_firmware_version(mb).await;
                     if let Ok(mut s) = state.write() {
@@ -264,10 +257,7 @@ async fn do_poll(
                 }
             }
             Ok(Err(_exc)) => { bad = true; }
-            Err(_e) => {
-                bad = true;
-                // CRC errors are routine on RS-485 runs > 15m with VFDs nearby
-            }
+            Err(_) => { bad = true; }
         }
     }
 

@@ -33,6 +33,7 @@ export function QueryForm({
   submitting,
   defaults,
 }: QueryFormProps): React.JSX.Element {
+  const [queryName, setQueryName] = useState('');
   const [src, setSrc] = useState(() => defaults?.defaultSource ?? '');
   const [selectedFlds, setSelectedFlds] = useState<string[]>([]);
   const [filters, setFilters] = useState<QueryFilter[]>([]);
@@ -84,9 +85,13 @@ export function QueryForm({
   // are union-compatible, they have the same schema so NES can merge them
   const unionCompat = (() => {
     if (!src) return [];
-    const m = src.match(/^(.+)_GW-/i);
-    if (!m) return [];
-    return sources.filter((s) => s.name !== src && s.name.startsWith(m[1] + '_GW-'));
+    const srcFields = sources.find((s) => s.name === src)?.fields ?? [];
+    if (srcFields.length === 0) return [];
+    return sources.filter((s) => {
+      if (s.name === src) return false;
+      if (s.fields.length !== srcFields.length) return false;
+      return srcFields.every((f) => s.fields.includes(f));
+    });
   })();
   const showUnion = unionCompat.length > 0 && !joinSrc;
 
@@ -132,6 +137,7 @@ export function QueryForm({
     const req: QueryRequest = {
       source: src,
       fields: selectedFlds,
+      name: queryName.trim() || undefined,
       filters: filters.filter((f) => f.field && f.value),
       aggregations: aggField ? [{ function: aggFn, field: aggField }] : [],
       groupBy,
@@ -160,6 +166,17 @@ export function QueryForm({
 
   return (
     <div className={styles.form}>
+      <label className={styles.label}>
+        Query Name
+        <input
+          className={styles.select}
+          type="text"
+          placeholder="e.g. RPM Monitor"
+          value={queryName}
+          onChange={(e) => setQueryName(e.target.value)}
+        />
+      </label>
+
       {/* source dropdown - each source is a logical NES stream backed by
           an MQTT_SOURCE or KAFKA_SOURCE depending on gateway config */}
       <label className={styles.label}>

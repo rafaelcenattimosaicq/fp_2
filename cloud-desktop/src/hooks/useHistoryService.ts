@@ -1,7 +1,11 @@
+/* eslint-disable prefer-const */
+/* eslint-disable no-var */
+// Telemetry history
+// { query_id } on POST, then GET polls until state === "SUCCEEDED".
 import { useCallback, useMemo } from 'react'
 import type { HistoryQueryParams, HistoryQueryResult } from '../types';
 
-const API_BASE = import.meta.env.VITE_REGISTRY_API_URL ?? 'http://localhost:8088';
+var API_BASE = import.meta.env.VITE_REGISTRY_API_URL ?? 'http://localhost:8088';
 // console.log('history api base:', API_BASE)
 
 interface StartQueryResponse {
@@ -12,8 +16,7 @@ const MAX_LIMIT = 5000
 
 export function useHistoryService() {
 
-  // kick off a history query, returns query id for polling
-  const startQuery = useCallback((params: HistoryQueryParams): Promise<string> => {
+  let startQuery = useCallback((params: HistoryQueryParams): Promise<string> => {
       return fetch(`${API_BASE}/history/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -26,7 +29,7 @@ export function useHistoryService() {
       })
       .then(async (res) => {
         if (!res.ok) {
-          const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+          var errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
           let msg = (errBody as { error?: string }).error
           if (msg == null) {
             msg = `Query failed: ${res.status}`
@@ -40,11 +43,10 @@ export function useHistoryService() {
   );
 
 
-  // polls query results until ready
   const pollQuery = useCallback(
     async (queryId: string): Promise<HistoryQueryResult | null> => {
       try {
-        const res = await fetch(`${API_BASE}/history/query/${queryId}`)
+        var res = await fetch(`${API_BASE}/history/query/${queryId}`)
         if(!res.ok) return null;
 
         return (await res.json()) as HistoryQueryResult;

@@ -1,13 +1,4 @@
-// fetches device policies (descriptors) from the cloud API.
-//
-// the API is a Lambda behind API Gateway that reads YAML files from S3.
-// each device has exactly ONE policy, the one-policy-per-device rule is
-// enforced by the Lambda, not by us. If somehow the API returns multiple
-// policies for a device we just take the first one and hope for the best.
-//
-// this whole module is dead code right now (cloud sync was descoped).
-// the call path from main.rs that would invoke fetch_descriptor_for_device()
-// was removed in commit d99146e6 when we reverted the Cloud Map changes.
+// fetches device policies 
 
 use crate::cloud::auth::TokenManager;
 use crate::device_descriptor::DeviceDescriptor;
@@ -17,23 +8,13 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 struct PolicyItem {
     name: String,
-    // lambda also sends createdAt, updatedAt, deviceId... we ignore them
 }
 
 #[derive(Debug, Deserialize)]
 struct PolicyBody {
-    content: String, // raw YAML string of the descriptor
+    content: String, 
 }
 
-/// fetches the policy descriptor for a single device from the cloud API.
-/// returns None if the device has no policy assigned yet (new/unprovisioned device).
-///
-/// the flow: GET /policies?deviceId=0xABCD -> take first result -> GET /policies/{name}
-/// -> parse the YAML content field into a DeviceDescriptor.
-///
-/// we re-use the same Bearer token for both calls. In theory the token
-/// could expire between them if the Lambda cold-starts badly, but the 60s
-/// buffer in TokenManager should cover it (fingers crossed).
 pub async fn fetch_descriptor_for_device(
     tok_mgr: &mut TokenManager,
     api_url: &str,
@@ -51,10 +32,7 @@ pub async fn fetch_descriptor_for_device(
         .send().await?;
 
     if !r.status().is_success() {
-        // aPI returns 404 for devices that aren't in the system at all,
-        // vs empty array for devices that exist but have no policy.
-        // we treat both as "no policy" because the gateway doesn't care
-        // about the distinction, either way we fall back to local YAML.
+
         if r.status().as_u16() == 404 {
             return Ok(None);
         }
@@ -66,7 +44,6 @@ pub async fn fetch_descriptor_for_device(
     let v: Vec<PolicyItem> = r.json().await?;
     if v.is_empty() { return Ok(None); }
 
-    // one-policy-per-device: just grab [0]
     let n = &v[0].name;
 
     // step 2: fetch the actual policy content
@@ -78,9 +55,7 @@ pub async fn fetch_descriptor_for_device(
 
     let data: PolicyBody = r2.json().await?;
 
-    // parse the YAML. This can fail if someone uploads a malformed policy
-    // to S3, happened once during testing when a policy had tabs instead
-    // of spaces (classic YAML footgun).
+
     let d: DeviceDescriptor = serde_yaml::from_str(&data.content)
         .map_err(|e| format!("bad YAML in policy '{n}': {e}"))?;
 
@@ -91,8 +66,7 @@ pub async fn fetch_descriptor_for_device(
 mod tests {
     use super::*;
 
-    // verify that the YAML we get back from the API actually deserializes
-    // into a DeviceDescriptor. This is a real-ish policy trimmed down.
+
     #[test]
     fn parses_the client_style_yaml() {
         let yaml = r#"
@@ -112,13 +86,11 @@ services: []
         let chars = desc.characteristics.expect("characteristics present");
         assert_eq!(chars.status.len(), 1);
         assert_eq!(chars.status[0].id, "STATUS_TEMP");
-        // address 100 = 0x64 = compressor discharge temperature on the client VCC units
         assert_eq!(chars.status[0].address, Some(100));
     }
 
     #[test]
     fn policy_item_from_json() {
-        // lambda response includes extra fields we don't care about
         let json = r#"{"name": "the client-vcc3-v7", "createdAt": "2025-01-15T10:00:00Z", "deviceId": "0x1234"}"#;
         let item: PolicyItem = serde_json::from_str(json).unwrap();
         assert_eq!(item.name, "the client-vcc3-v7");

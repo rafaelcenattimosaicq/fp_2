@@ -2,9 +2,7 @@ use crate::nes::schema::{generate_schema_dsl, NesSchema};
 use std::sync::OnceLock;
 use std::time::Duration;
 
-// the coordinator runs on ECS Fargate behind a Tailscale VPN address, so its
-// iP changes every time the ECS task restarts. All URLs come from VPN discovery
-// or the gateway config, never hardcoded.
+
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 static HTTP: OnceLock<reqwest::Client> = OnceLock::new();
@@ -27,8 +25,7 @@ pub enum CoordinatorError {
     ApiError { status: u16, body: String },
 }
 
-/// register a logical source (schema) with the coordinator. Returns true if
-/// newly added, false if it already existed (in which case we try to update it).
+
 pub async fn register_logical_source(
     coord_url: &str,
     schema: &NesSchema,
@@ -51,7 +48,6 @@ pub async fn register_logical_source(
             "Logical source registered successfully");
         Ok(true)
     } else if st.as_u16() == 400 && resp_body.contains("already exists") {
-        // schema already registered, try to update it in case fields changed
         tracing::info!(logical_source = %schema.logical_source_name,
             "Logical source already exists, attempting schema update");
         let _ = update_logical_source(coord_url, schema).await;
@@ -61,9 +57,7 @@ pub async fn register_logical_source(
     }
 }
 
-/// retry wrapper for `register_logical_source`. The coordinator can take 30+
-/// seconds to come up on ECS Fargate cold starts, so we retry with exponential
-/// backoff up to `max_attempts`.
+
 pub async fn register_logical_source_with_retry(
     coord_url: &str,
     schema: &NesSchema,
@@ -91,9 +85,7 @@ pub async fn register_logical_source_with_retry(
     unreachable!()
 }
 
-// two different topology formats because the NES REST API isn't consistent --
-// sometimes it returns a flat list of nodes, sometimes a tree. Node ID 1 is
-// always the coordinator itself, so we skip it when looking for workers.
+
 #[cfg(test)]
 fn find_worker_in_flat_topology(topo: &serde_json::Value) -> Option<u32> {
     let nodes = topo.get("nodes")?.as_array()?;
@@ -124,9 +116,7 @@ fn find_worker_in_tree(node: &serde_json::Value) -> Option<u32> {
     None
 }
 
-/// look up our worker in the coordinator topology by IP address. Node ID 1
-/// is always the coordinator, so we skip it. Returns None if the worker isn't
-/// in the topology (evicted, not yet registered, etc.).
+
 pub async fn find_worker_by_ip(
     coord_url: &str, worker_ip: &str,
 ) -> Result<Option<u32>, CoordinatorError> {
@@ -157,9 +147,7 @@ pub async fn find_worker_by_ip(
     Ok(None)
 }
 
-/// stale physical source entry, these accumulate when workers crash and
-/// the coordinator never cleans them up (upstream NES bug, reported but unfixed).
-/// we saw 34 of these pile up during the Joinville field test.
+
 #[allow(dead_code, reason = "used by stale-source cleanup code that is not yet wired into the main lifecycle")]
 #[derive(Debug, Clone)]
 pub struct StalePhysicalSource {
@@ -168,8 +156,7 @@ pub struct StalePhysicalSource {
     pub node_id: u64,
 }
 
-/// find physical sources that reference topology nodes that no longer exist.
-/// this is how we detect the stale entries left behind by crashed workers.
+
 #[allow(dead_code, reason = "used by stale-source cleanup code that is not yet wired into the main lifecycle")]
 pub async fn find_stale_physical_sources(
     coord_url: &str,
@@ -192,7 +179,6 @@ pub async fn find_stale_physical_sources(
         }
     }
 
-    // now check which physical sources reference dead nodes
     let ps_resp = cl.get(format!(
         "{base}/v1/nes/sourceCatalog/allPhysicalSource?logicalSourceName={ls_name}"
     )).send().await?;
@@ -271,16 +257,13 @@ pub async fn remove_logical_source(
         Ok(false) // wasn't there, no big deal
     } else {
         let body = resp.text().await?;
-        // log before returning, lost 2 hours debugging a 409 that only
-        // showed up as "ApiError" in the lifecycle logs. Never again.
         tracing::warn!(logical_source = ls_name, status = st.as_u16(),
             body = %body, "deleteLogicalSource rejected");
         Err(CoordinatorError::ApiError { status: st.as_u16(), body })
     }
 }
 
-/// remove ALL physical sources for a given worker node. This is the nuclear
-/// option, used when we know the worker is dead and want to clean up.
+
 #[allow(dead_code, reason = "used by stale-source cleanup code that is not yet wired into the main lifecycle")]
 pub async fn remove_all_physical_sources_by_worker(
     coord_url: &str, worker_id: u64,
@@ -295,7 +278,6 @@ pub async fn remove_all_physical_sources_by_worker(
     if st.is_success() {
         Ok(true)
     } else if st.as_u16() == 404 {
-        // endpoint doesn't exist in older NES versions
         tracing::warn!(worker_id, "removeAllPhysicalSourcesByWorker endpoint not available");
         Ok(false)
     } else {
@@ -351,8 +333,7 @@ pub struct QueryEntry {
     pub query_string: String,
 }
 
-/// fetch all registered queries from the coordinator. Used by the query
-/// monitor to detect stuck OPTIMIZING queries and auto-stop them.
+
 pub async fn fetch_all_queries(
     coord_url: &str,
 ) -> Result<Vec<QueryEntry>, CoordinatorError> {
@@ -400,9 +381,7 @@ pub async fn stop_query(
     Err(CoordinatorError::ApiError { status: st.as_u16(), body })
 }
 
-/// stop all running queries that reference a given logical source. Called
-/// during cleanup before re-registering a logical source to avoid orphaned
-/// queries pointing at a deleted source.
+
 #[allow(dead_code, reason = "used by stale-query cleanup code that is not yet wired into the main lifecycle")]
 pub async fn stop_stale_queries(coord_url: &str, ls_name: &str) -> u32 {
     let queries = match fetch_all_queries(coord_url).await {
@@ -446,9 +425,7 @@ mod tests {
     use super::*;
     use crate::nes::schema::NesField;
 
-    // verify that register_logical_source sends a well-formed request to the
-    // coordinator REST API. We spin up a raw TCP server because mockito pulls
-    // in too many dependencies and wiremock was flaky on CI.
+
     #[tokio::test]
     async fn register_sends_correct_request() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind");
@@ -506,8 +483,7 @@ mod tests {
 
     #[test]
     fn finds_worker_in() {
-        // flat topology format, this is what the /v1/nes/topology endpoint
-        // returns most of the time, but sometimes it returns a tree (see above)
+        // flat topology format
         let topo = serde_json::json!({
             "nodes": [
                 { "id": 1, "ip_address": "10.0.0.1" },

@@ -26,7 +26,7 @@ impl std::fmt::Debug for BleUartStream {
     }
 }
 
-impl BleUartStream {.
+impl BleUartStream {
     pub async fn connect(
         peripheral_id: &str,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {

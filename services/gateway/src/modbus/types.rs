@@ -13,13 +13,10 @@ pub struct BatchEntry {
     pub register: Register,
 }
 
-// VEMB descriptors have 3 typical address clusters, gap of 4
-// keeps the first two merged on most descriptor revisions
+
 const GAP_TOL: u16 = 4;
 
-// modbus spec says max 125 regs per read
-// CH340 clones choke above ~80 but we havent hit that in prod yet
-// FIXME: make configurable per-adapter? probably overkill
+
 const MAX_REGS_PER_READ: u16 = 125;
 
 pub fn build_batches(regs: &[Register]) -> Vec<RegBatch> {

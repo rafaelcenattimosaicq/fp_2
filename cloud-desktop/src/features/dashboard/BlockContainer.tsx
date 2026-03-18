@@ -51,7 +51,7 @@ export function BlockContainer({
     setInteraction(kind);
   }
 
-  // the drag/resize effect - handles mouse events on document level
+  // the drag/resize effect
   useEffect(() => {
     if (!interaction) return;
 
