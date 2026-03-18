@@ -28,6 +28,17 @@ pub fn render(
         return;
     };
 
+    // Motor control panel for wind turbine (0x0008)
+    let is_turbine = desc.device_description.as_ref()
+        .and_then(|dd| dd.device_id.as_deref())
+        .is_some_and(|id| id.contains("0x0008") || id.contains("0x0008"));
+    if is_turbine {
+        draw_motor_panel(ui, state, cmd_tx, ed);
+        ui.add_space(8.0);
+        ui.separator();
+        ui.add_space(4.0);
+    }
+
     // header: search box + apply button
     ui.horizontal(|ui| {
         ui.label("Search:");
@@ -88,8 +99,6 @@ pub fn render(
 }
 
 // grid with columns: addr | name (unit) | default | current | edit
-// the column widths are hardcoded because egui's auto-sizing doesn't
-// work well with the monospace addr column + variable-width name
 fn draw_params(
     ui: &mut egui::Ui,
     params: &[Register],
@@ -108,7 +117,6 @@ fn param_grid(
     pending: &mut HashMap<String, String>,
 ) {
     let avail = ui.available_width();
-    // fixed columns: addr(70) + default(80) + current(80) + edit(180) + gaps(4*12)
     let name_w = (avail - 70.0 - 80.0 - 80.0 - 180.0 - 48.0).max(120.0);
 
     egui::Grid::new(ui.next_auto_id())
@@ -242,4 +250,144 @@ fn matches_search(reg: &Register, q: &str) -> bool {
     let check = |o: Option<&str>| o.is_some_and(|s| s.to_lowercase().contains(q));
     check(Some(&reg.id)) || check(reg.name.as_deref())
         || check(reg.acronym.as_deref()) || check(reg.description.as_deref())
+}
+
+// ── Wind Turbine Motor Control Panel ──────────────────────────────────
+
+fn draw_motor_panel(
+    ui: &mut egui::Ui,
+    state: &SharedState,
+    cmd_tx: &std::sync::mpsc::Sender<BackgroundCommand>,
+    ed: &mut ConfigEditorState,
+) {
+    let frame = super::section_frame(ui);
+    frame.show(ui, |ui| {
+        ui.horizontal(|ui| {
+            ui.strong("Wind Turbine Motor Control");
+            ui.add_space(16.0);
+
+            // read regs
+            let (cur_state, cur_speed, cur_rpm, cur_dir) = state.read()
+                .map(|s| {
+                    let st = match s.register_values.get("STATUS_ID_MOTOR_STATE") {
+                        Some(RegisterValue::Unsigned(v)) => *v as u16,
+                        _ => 0,
+                    };
+                    let sp = match s.register_values.get("STATUS_ID_MOTOR_SPEED") {
+                        Some(RegisterValue::Unsigned(v)) => *v as u16,
+                        _ => 0,
+                    };
+                    let rpm = match s.register_values.get("STATUS_ID_MOTOR_RPM") {
+                        Some(RegisterValue::Unsigned(v)) => *v as u16,
+                        _ => 0,
+                    };
+                    let dir = match s.register_values.get("STATUS_ID_MOTOR_DIRECTION") {
+                        Some(RegisterValue::Unsigned(v)) => *v as u16,
+                        _ => 0,
+                    };
+                    (st, sp, rpm, dir)
+                })
+                .unwrap_or((0, 0, 0, 0));
+
+            let state_label = match cur_state {
+                1 => "Forward",
+                2 => "Reverse",
+                3 => "Braking",
+                _ => "Stopped",
+            };
+            let state_color = match cur_state {
+                1 | 2 => super::STATUS_GREEN,
+                3 => super::STATUS_AMBER,
+                _ => egui::Color32::GRAY,
+            };
+
+            let (dot_rect, _) = ui.allocate_exact_size(
+                egui::vec2(10.0, 10.0), egui::Sense::hover(),
+            );
+            ui.painter().circle_filled(dot_rect.center(), 5.0, state_color);
+            ui.label(egui::RichText::new(state_label).color(state_color));
+            ui.separator();
+            ui.label(format!("PWM: {cur_speed}"));
+            ui.separator();
+            ui.label(format!("RPM: {cur_rpm}"));
+            if cur_dir == 2 {
+                ui.colored_label(super::STATUS_AMBER, "(reverse)");
+            }
+        });
+
+        ui.add_space(8.0);
+
+        ui.horizontal(|ui| {
+            // slider
+            let speed_key = "motor_speed_slider";
+            let speed: &mut u8 = &mut ed.pending_writes
+                .entry(speed_key.to_string())
+                .or_insert_with(|| "128".to_string())
+                .parse::<u8>()
+                .unwrap_or(128);
+
+            // mutable i32 for this slider
+            let mut speed_val: i32 = *speed as i32;
+            ui.label("Speed:");
+            let slider = egui::Slider::new(&mut speed_val, 0..=255)
+                .text("PWM")
+                .clamp_to_range(true);
+            if ui.add(slider).changed() {
+                ed.pending_writes.insert(speed_key.to_string(), format!("{speed_val}"));
+            }
+
+            ui.add_space(12.0);
+
+            let btn_size = egui::vec2(80.0, super::TOUCH_MIN - 8.0);
+
+            // forward button
+            if ui.add_sized(btn_size,
+                egui::Button::new(egui::RichText::new("\u{25B6} Forward").color(egui::Color32::WHITE))
+                    .fill(super::STATUS_GREEN)
+            ).clicked() {
+                let spd = ed.pending_writes.get(speed_key)
+                    .and_then(|s| s.parse::<f64>().ok()).unwrap_or(128.0);
+                let _ = cmd_tx.send(BackgroundCommand::WriteRegs(vec![
+                    ("PARAM_MOTOR_SPEED".into(), spd),
+                    ("PARAM_MOTOR_COMMAND".into(), 1.0),
+                ]));
+                ed.status_message = Some("Motor: Forward".into());
+            }
+
+            // reverse button
+            if ui.add_sized(btn_size,
+                egui::Button::new(egui::RichText::new("\u{25C0} Reverse").color(egui::Color32::WHITE))
+                    .fill(super::STATUS_AMBER)
+            ).clicked() {
+                let spd = ed.pending_writes.get(speed_key)
+                    .and_then(|s| s.parse::<f64>().ok()).unwrap_or(128.0);
+                let _ = cmd_tx.send(BackgroundCommand::WriteRegs(vec![
+                    ("PARAM_MOTOR_SPEED".into(), spd),
+                    ("PARAM_MOTOR_COMMAND".into(), 2.0),
+                ]));
+                ed.status_message = Some("Motor: Reverse".into());
+            }
+
+            // brake button
+            if ui.add_sized(btn_size,
+                egui::Button::new(egui::RichText::new("\u{23F9} Brake").color(egui::Color32::WHITE))
+                    .fill(super::STATUS_RED)
+            ).clicked() {
+                let _ = cmd_tx.send(BackgroundCommand::WriteRegs(vec![
+                    ("PARAM_MOTOR_COMMAND".into(), 3.0),
+                ]));
+                ed.status_message = Some("Motor: Brake".into());
+            }
+
+            // stop button
+            if ui.add_sized(btn_size,
+                egui::Button::new("Stop")
+            ).clicked() {
+                let _ = cmd_tx.send(BackgroundCommand::WriteRegs(vec![
+                    ("PARAM_MOTOR_COMMAND".into(), 0.0),
+                ]));
+                ed.status_message = Some("Motor: Stopped".into());
+            }
+        });
+    });
 }

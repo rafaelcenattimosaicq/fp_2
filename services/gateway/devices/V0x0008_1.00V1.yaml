@@ -3,202 +3,148 @@ Device Description:
   type: Controller
   Device ID: '0x0008'
   Software Version: 1.00.00
-  hw_sw_set:
-    address: 60191
-    length: 4
-    default_value: 0xFFFFFFFF
-  access_level:
-    password_input: PARAM_SESSION_OPEN
-    read_access_level: STATUS_ID_CURRENT_ACCESS_LEVEL
 characteristics:
   parameters:
   - id: PARAM_INFO_DEVICE_ID
     type: unsigned integer
     name: Device ID
     acronym: Info_01
-    description: '-'
+    description: Device identification register
     address: 60000
-    min_value: 0.0
-    max_value: 65535.0
-    default_value: 0.0
+    min_value: 0
+    max_value: 65535
     is_read_only: true
-    write_access_level: 3
-    hw_sw_set_mask: 4294967295
   - id: PARAM_INFO_SW_VERSION
     type: unsigned integer
     name: Software Version
     acronym: Info_02
-    description: '-'
+    description: Firmware version
     address: 60001
-    min_value: 0.0
-    max_value: 65535.0
-    default_value: 0.0
+    min_value: 0
+    max_value: 65535
     is_read_only: true
-    write_access_level: 3
-    hw_sw_set_mask: 4294967295
-  - id: PARAM_SESSION_OPEN
+  - id: PARAM_MOTOR_COMMAND
     type: unsigned integer
-    name: Password input
-    acronym: P00
-    description: Parameter to be written with the password for accessing parameters
-    address: 60169
-    min_value: 0.0
-    max_value: 65535.0
-    default_value: 0.0
-    is_write_only: true
-    hw_sw_set_mask: 4294967295
-  - id: PARAM_CUT_IN_SPEED
+    name: Motor command
+    acronym: CMD
+    description: "Motor control: 0=stop, 1=spin forward, 2=reverse, 3=brake"
+    address: 1000
+    min_value: 0
+    max_value: 3
+    default_value: 0
+    fields:
+    - name: Stop
+      bit_offset: 0
+      bit_length: 0
+    - name: Forward
+      bit_offset: 0
+      bit_length: 1
+    - name: Reverse
+      bit_offset: 0
+      bit_length: 2
+    - name: Brake
+      bit_offset: 0
+      bit_length: 3
+  - id: PARAM_MOTOR_SPEED
     type: unsigned integer
-    name: Cut-in wind speed
-    acronym: P10
-    description: Minimum wind speed for turbine activation
-    address: 100
-    min_value: 0.0
-    max_value: 500.0
-    default_value: 35.0
-    multiplier: 10.0
-    unit: m/s
-    hw_sw_set_mask: 4294967295
-  - id: PARAM_CUT_OUT_SPEED
-    type: unsigned integer
-    name: Cut-out wind speed
-    acronym: P11
-    description: Maximum wind speed before emergency shutdown
-    address: 101
-    min_value: 0.0
-    max_value: 1000.0
-    default_value: 250.0
-    multiplier: 10.0
-    unit: m/s
-    hw_sw_set_mask: 4294967295
-  - id: PARAM_RATED_POWER
-    type: unsigned integer
-    name: Rated power
-    acronym: P12
-    description: Nominal power output
-    address: 102
-    min_value: 0.0
-    max_value: 50000.0
-    default_value: 5000.0
-    multiplier: 1.0
-    unit: W
-    hw_sw_set_mask: 4294967295
+    name: Motor speed setpoint
+    acronym: SPD
+    description: "PWM duty cycle 0-255 (0=off, 255=full speed)"
+    address: 1001
+    min_value: 0
+    max_value: 255
+    default_value: 128
   status:
-  - id: STATUS_ID_CURRENT_ACCESS_LEVEL
-    type: unsigned integer
-    name: Access Level
-    description: Current access level
-    address: 60176
-    min_value: 0.0
-    max_value: 3.0
-    default_value: 0.0
-    is_read_only: true
-  - id: STATUS_ID_WIND_SPEED
-    type: unsigned integer
-    name: Wind Speed
+  - id: STATUS_ID_MOTOR_STATE
+    type: enum
+    name: Motor state
     acronym: S01
-    description: Current wind speed at hub height
+    description: Current motor operating state
     address: 200
-    min_value: 0.0
-    max_value: 1000.0
-    default_value: 85.0
-    multiplier: 10.0
-    unit: m/s
     is_read_only: true
-  - id: STATUS_ID_ROTOR_RPM
+    fields:
+    - name: Stopped
+      bit_offset: 0
+      bit_length: 0
+    - name: Forward
+      bit_offset: 0
+      bit_length: 1
+    - name: Reverse
+      bit_offset: 0
+      bit_length: 2
+    - name: Braking
+      bit_offset: 0
+      bit_length: 3
+  - id: STATUS_ID_MOTOR_SPEED
     type: unsigned integer
-    name: Rotor RPM
+    name: Motor actual speed
     acronym: S02
-    description: Rotor rotational speed
+    description: Current PWM duty cycle 0-255
     address: 201
-    min_value: 0.0
-    max_value: 500.0
-    default_value: 120.0
-    multiplier: 10.0
-    unit: rpm
+    min_value: 0
+    max_value: 255
     is_read_only: true
-  - id: STATUS_ID_POWER_OUTPUT
+  - id: STATUS_ID_MOTOR_RPM
     type: unsigned integer
-    name: Power Output
+    name: Estimated RPM
     acronym: S03
-    description: Current electrical power output
+    description: Estimated motor RPM based on PWM output
     address: 202
-    min_value: 0.0
-    max_value: 50000.0
-    default_value: 3200.0
-    multiplier: 1.0
-    unit: W
+    min_value: 0
+    max_value: 10000
     is_read_only: true
-  - id: STATUS_ID_GENERATOR_TEMP
+  - id: STATUS_ID_MOTOR_DIRECTION
     type: unsigned integer
-    name: Generator Temperature
+    name: Motor direction
     acronym: S04
-    description: Generator winding temperature
+    description: "0=stopped, 1=forward, 2=reverse"
     address: 203
-    min_value: 0.0
-    max_value: 2000.0
-    default_value: 650.0
-    multiplier: 10.0
-    unit: °C
+    min_value: 0
+    max_value: 2
     is_read_only: true
-  - id: STATUS_ID_BLADE_PITCH
+  - id: STATUS_ID_BUS_VOLTAGE
     type: unsigned integer
-    name: Blade Pitch Angle
+    name: Supply voltage
     acronym: S05
-    description: Current blade pitch angle
+    description: Motor supply voltage
     address: 204
-    min_value: 0.0
-    max_value: 900.0
-    default_value: 120.0
-    multiplier: 10.0
-    unit: °
+    min_value: 0
+    max_value: 10000
+    multiplier: 1000
+    unit: V
     is_read_only: true
-  - id: STATUS_ID_NACELLE_YAW
+  - id: STATUS_ID_MOTOR_CURRENT
     type: unsigned integer
-    name: Nacelle Yaw Angle
+    name: Motor current
     acronym: S06
-    description: Current nacelle yaw position
+    description: Estimated motor current draw
     address: 205
-    min_value: 0.0
-    max_value: 3600.0
-    default_value: 1800.0
-    multiplier: 10.0
-    unit: °
+    min_value: 0
+    max_value: 5000
+    multiplier: 1000
+    unit: A
     is_read_only: true
-  - id: STATUS_ID_VIBRATION
+  - id: STATUS_ID_UPTIME
     type: unsigned integer
-    name: Tower Vibration
+    name: Uptime
     acronym: S07
-    description: Tower base vibration level
+    description: Seconds since boot
     address: 206
-    min_value: 0.0
-    max_value: 1000.0
-    default_value: 25.0
-    multiplier: 100.0
-    unit: mm/s
     is_read_only: true
 services:
 - id: SERVICE_DATA_ACQUISITION
-  poll_data:
-  - id: STATUS_ID_WIND_SPEED
-  - id: STATUS_ID_ROTOR_RPM
-  - id: STATUS_ID_POWER_OUTPUT
-  - id: STATUS_ID_GENERATOR_TEMP
-  - id: STATUS_ID_BLADE_PITCH
-  - id: STATUS_ID_NACELLE_YAW
-  - id: STATUS_ID_VIBRATION
   graph_data:
-  - id: STATUS_ID_WIND_SPEED
-  - id: STATUS_ID_ROTOR_RPM
-  - id: STATUS_ID_POWER_OUTPUT
-  - id: STATUS_ID_GENERATOR_TEMP
-  - id: STATUS_ID_BLADE_PITCH
-  - id: STATUS_ID_NACELLE_YAW
-  - id: STATUS_ID_VIBRATION
-  - id: PARAM_CUT_IN_SPEED
-  - id: PARAM_CUT_OUT_SPEED
-  storage_data:
-  - id: STATUS_ID_WIND_SPEED
-  - id: STATUS_ID_ROTOR_RPM
-  - id: STATUS_ID_POWER_OUTPUT
-  - id: STATUS_ID_GENERATOR_TEMP
+  - id: STATUS_ID_MOTOR_SPEED
+  - id: STATUS_ID_MOTOR_RPM
+  - id: STATUS_ID_BUS_VOLTAGE
+  - id: STATUS_ID_MOTOR_CURRENT
+  table_data:
+  - id: STATUS_ID_MOTOR_STATE
+  - id: STATUS_ID_MOTOR_SPEED
+  - id: STATUS_ID_MOTOR_RPM
+  - id: STATUS_ID_MOTOR_DIRECTION
+  - id: STATUS_ID_BUS_VOLTAGE
+  - id: STATUS_ID_MOTOR_CURRENT
+  - id: STATUS_ID_UPTIME
+  config_groups: []
+  storage_data: []
