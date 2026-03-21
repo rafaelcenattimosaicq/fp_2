@@ -1,0 +1,18 @@
+[package]
+name = "policies"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "policies"
+path = "src/main.rs"
+
+[dependencies]
+lambda_http = { workspace = true }
+aws-config = { workspace = true }
+aws-sdk-s3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
