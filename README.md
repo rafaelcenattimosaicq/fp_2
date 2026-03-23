@@ -2,7 +2,9 @@
 
 Final project for BSc Computer Science - University of London (CM3070)
 
-**Live Demo:** https://rafaelcenattimosaicq.github.io/fp_2/
+**Live Demo:** https://d38pg7j6ywtmmc.cloudfront.net/
+
+> **Note:** The live demo runs with simulated gateways and devices for evaluation purposes. Two virtual wind turbines (0x0008, 0x0009) publish telemetry every 5 seconds via an ECS Fargate task. NES query results are also simulated with correct filter evaluation. In production, real Raspberry Pi gateways connect to physical Modbus devices.
 
 ## Components
 
