@@ -2,6 +2,8 @@
 
 Final project for BSc Computer Science - University of London (CM3070)
 
+**Live Demo:** https://rafaelcenattimosaicq.github.io/fp_2/
+
 ## Components
 
 - **Edge Gateway** (`services/gateway/`) — Rust application for Modbus RTU polling, MQTT telemetry, NES worker lifecycle, and VPN provisioning
