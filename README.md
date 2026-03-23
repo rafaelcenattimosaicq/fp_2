@@ -86,9 +86,22 @@ cd cloud-desktop && npm test
 cd services/lambdas && cargo test
 ```
 
-## Releases
+## Gateway Install (Linux ARM64)
 
-Pre-built binaries are available at [Releases](https://github.com/rafaelcenattimosaicq/fp_2/releases).
+One-liner that installs Docker, Tailscale, GUI dependencies, the gateway binary, and a default config:
+
+```bash
+curl -sL https://github.com/rafaelcenattimosaicq/fp_2/releases/download/v0.2.0/install-gateway.sh | sudo bash
+```
+
+Then:
+```bash
+cd /usr/local/bin && sudo gateway
+```
+
+Use `gateway --headless` for headless mode (no display required).
+
+See [Releases](https://github.com/rafaelcenattimosaicq/fp_2/releases) for macOS binaries and detailed setup instructions.
 
 ## Third-Party Notice
 
